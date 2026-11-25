@@ -8,12 +8,22 @@
     "scheme": "seamwork",
     "android": {
       "package": "com.lydiaperspective.seamworkstudio",
+      "compileSdkVersion": 36,
+      "targetSdkVersion": 36,
+      "minSdkVersion": 24,
       "adaptiveIcon": {
         "backgroundColor": "#F4EFE7"
       }
     },
     "plugins": [
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Seamwork Studio to add garment inspiration photos to your projects.",
+          "cameraPermission": "Allow Seamwork Studio to capture garment references for your projects."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": false
