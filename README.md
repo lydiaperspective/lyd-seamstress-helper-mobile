@@ -4,9 +4,9 @@ A tablet-first garment design studio for Android, built natively with **Kotlin a
 
 ## Open in Android Studio
 
-1. Open this repository root (the folder containing `settings.gradle.kts`).
-2. Install Android SDK Platform 36 if prompted.
-3. Use JDK 17 and allow Gradle sync.
+1. Run **Actions → Build native Android app → Run workflow** on GitHub once to generate the Gradle wrapper and build a debug APK.
+2. Clone/download the updated repository and open its root (the folder containing `settings.gradle.kts`) in Android Studio.
+3. Install Android SDK Platform 36 if prompted, use JDK 17, and allow Gradle sync.
 4. Run the `app` configuration on an Android 16 emulator or connected tablet.
 
 See [ANDROID_STUDIO.md](ANDROID_STUDIO.md).
