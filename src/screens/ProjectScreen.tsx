@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { addInspiration, deleteInspiration, getInspirations, type InspirationItem } from '../data/database';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
@@ -22,6 +24,45 @@ export function ProjectScreen() {
   const navigation = useNavigation<Navigation>();
   const { project } = route.params;
   const [active, setActive] = useState<WorkspaceKey>('inspiration');
+  const [inspirations, setInspirations] = useState<InspirationItem[]>([]);
+  const [referenceLink, setReferenceLink] = useState('');
+  const [savingReference, setSavingReference] = useState(false);
+
+  const refreshInspirations = async () => setInspirations(await getInspirations(project.id));
+  React.useEffect(() => { void refreshInspirations(); }, [project.id]);
+
+  const importReferencePhotos = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) return Alert.alert('Photo access needed', 'Allow photo access to add garment references.');
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, quality: 0.9 });
+    if (result.canceled) return;
+    setSavingReference(true);
+    try {
+      for (const asset of result.assets) await addInspiration(project.id, 'image', asset.uri, asset.fileName ?? 'Reference photo');
+      await refreshInspirations();
+    } catch { Alert.alert('Import failed', 'Please try again.'); }
+    finally { setSavingReference(false); }
+  };
+
+  const saveReferenceLink = async () => {
+    const raw = referenceLink.trim();
+    if (!raw) return;
+    const url = raw.startsWith('http') ? raw : 'https://' + raw;
+    try {
+      const parsed = new URL(url);
+      if (!parsed.hostname.includes('.')) throw new Error();
+      setSavingReference(true);
+      await addInspiration(project.id, 'link', parsed.toString(), parsed.hostname.replace(/^www\\./, ''));
+      setReferenceLink('');
+      await refreshInspirations();
+    } catch { Alert.alert('Invalid link', 'Enter a website address or Pinterest pin URL.'); }
+    finally { setSavingReference(false); }
+  };
+
+  const removeReference = (item: InspirationItem) => Alert.alert('Remove reference?', 'Remove this item from the project?', [
+    { text: 'Cancel', style: 'cancel' },
+    { text: 'Remove', style: 'destructive', onPress: async () => { await deleteInspiration(item.id); await refreshInspirations(); } },
+  ]);
   const detail = workspaceDetails[active];
   const selected = WORKSPACES.find((item) => item.key === active)!;
 
@@ -61,7 +102,23 @@ export function ProjectScreen() {
           <Text style={styles.contentTitle}>{detail.headline}</Text>
           <Text style={styles.contentDescription}>{detail.description}</Text>
 
-          <View style={styles.featurePanel}>
+          {active === 'inspiration' && <View style={styles.inspirationArea}>
+            <Pressable style={styles.importButton} onPress={() => void importReferencePhotos()} disabled={savingReference}>
+              <Text style={styles.importButtonText}>{savingReference ? 'Saving…' : '＋  Import photos'}</Text>
+            </Pressable>
+            <View style={styles.referenceLinkRow}>
+              <TextInput value={referenceLink} onChangeText={setReferenceLink} placeholder="Paste a Pinterest or website link" autoCapitalize="none" autoCorrect={false} keyboardType="url" style={styles.referenceInput} onSubmitEditing={() => void saveReferenceLink()} />
+              <Pressable style={styles.referenceSave} onPress={() => void saveReferenceLink()} disabled={!referenceLink.trim() || savingReference}><Text style={styles.referenceSaveText}>Save link</Text></Pressable>
+            </View>
+            <Text style={styles.referenceCount}>YOUR REFERENCES · {inspirations.length}</Text>
+            <View style={styles.referenceGrid}>{inspirations.map((item) => <View key={item.id} style={styles.referenceCard}>
+              {item.kind === 'image' ? <Pressable onPress={() => void Linking.openURL(item.uri)}><Image source={{ uri: item.uri }} style={styles.referenceImage} /></Pressable> :
+                <Pressable style={styles.referenceLinkCard} onPress={() => void Linking.openURL(item.uri)}><Text style={styles.referenceDomain}>{item.title}</Text><Text style={styles.referenceOpen}>OPEN LINK ↗</Text></Pressable>}
+              <Pressable onPress={() => removeReference(item)} style={styles.referenceRemove}><Text style={styles.referenceRemoveText}>Remove</Text></Pressable>
+            </View>)}</View>
+          </View>}
+
+          {active !== 'inspiration' && <View style={styles.featurePanel}>
             <View style={styles.panelTop}>
               <View style={styles.panelIcon}><Text style={styles.panelIconText}>{selected.symbol}</Text></View>
               <View style={styles.panelHeading}>
@@ -86,7 +143,7 @@ export function ProjectScreen() {
           <View style={styles.tip}>
             <Text style={styles.tipLabel}>DESIGN PRINCIPLE</Text>
             <Text style={styles.tipText}>Your project stays together from first reference to finished pattern.</Text>
-          </View>
+          </View>}
         </ScrollView>
       </View>
 
@@ -104,6 +161,22 @@ export function ProjectScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#F5F1EA' },
+  inspirationArea: { marginTop: 22 },
+  importButton: { backgroundColor: '#71816D', borderRadius: 8, padding: 13, alignItems: 'center' },
+  importButtonText: { color: '#FFF', fontSize: 12, fontWeight: '700' },
+  referenceLinkRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  referenceInput: { flex: 1, minHeight: 44, backgroundColor: '#FBF9F5', borderRadius: 8, paddingHorizontal: 12, color: '#44443C', fontSize: 12 },
+  referenceSave: { backgroundColor: '#E5E9DF', borderRadius: 8, paddingHorizontal: 18, justifyContent: 'center' },
+  referenceSaveText: { color: '#5E705A', fontWeight: '700', fontSize: 11 },
+  referenceCount: { color: '#777568', fontSize: 9, letterSpacing: 1.3, fontWeight: '700', marginTop: 22, marginBottom: 10 },
+  referenceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  referenceCard: { width: '31%', backgroundColor: '#FBF9F5', borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: '#E9E2D8' },
+  referenceImage: { width: '100%', height: 115, backgroundColor: '#EAE6DE' },
+  referenceLinkCard: { height: 115, backgroundColor: '#E8EBE2', padding: 12, justifyContent: 'center' },
+  referenceDomain: { color: '#596653', fontFamily: 'Georgia', fontSize: 15 },
+  referenceOpen: { color: '#84917C', fontSize: 8, marginTop: 8 },
+  referenceRemove: { padding: 8, alignItems: 'flex-end' },
+  referenceRemoveText: { color: '#A17F72', fontSize: 9 },
   header: { height: 70, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 25, borderBottomWidth: 1, borderBottomColor: '#E6DED3', backgroundColor: '#FBF9F5' },
   back: { paddingVertical: 10, paddingRight: 18 },
   backText: { color: '#657765', fontSize: 13, fontWeight: '600' },
