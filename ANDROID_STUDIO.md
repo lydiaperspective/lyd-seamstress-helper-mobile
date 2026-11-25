@@ -4,12 +4,14 @@ Seamwork Studio is a native Android application using **Kotlin and Jetpack Compo
 
 ## Open in Android Studio
 
-1. Clone or download this repository.
-2. In Android Studio, choose **Open** and select the repository root (the folder containing `settings.gradle.kts`).
-3. Install Android SDK Platform 36 when prompted.
-4. Use JDK 17 for Gradle and allow Gradle sync to finish.
-5. Select an Android 16 emulator or connect your tablet with USB debugging enabled.
-6. Press **Run**.
+1. Open the repository on GitHub and select **Actions**.
+2. Run **Build native Android app** using **Run workflow**. This generates the Gradle wrapper, builds a debug APK, and saves the APK as an artifact.
+3. Clone or download the updated repository after the workflow completes.
+4. In Android Studio, choose **Open** and select the repository root (the folder containing `settings.gradle.kts`).
+5. Install Android SDK Platform 36 when prompted and use JDK 17.
+6. Select an Android 16 emulator or connect your tablet with USB debugging enabled, then press **Run**.
+
+You can also download `seamwork-studio-debug-apk` from the workflow run to install the test build.
 
 The application module is `app`; application ID: `com.lydiaperspective.seamworkstudio`.
 
