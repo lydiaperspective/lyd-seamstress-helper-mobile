@@ -28,10 +28,18 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.13'
-      - name: Generate Gradle wrapper
-        run: gradle wrapper --gradle-version 8.13
-      - name: Build debug APK
-        run: ./gradlew assembleDebug
+      - name: Generate Gradle 8.13 wrapper in an isolated directory
+        run: |
+          mkdir -p /tmp/wrapper-bootstrap
+          printf "tasks.register('noop')\\n" > /tmp/wrapper-bootstrap/build.gradle
+          gradle -p /tmp/wrapper-bootstrap wrapper --gradle-version 8.13
+          mkdir -p gradle/wrapper
+          cp /tmp/wrapper-bootstrap/gradlew .
+          cp /tmp/wrapper-bootstrap/gradlew.bat .
+          cp /tmp/wrapper-bootstrap/gradle/wrapper/gradle-wrapper.jar gradle/wrapper/
+          cp /tmp/wrapper-bootstrap/gradle/wrapper/gradle-wrapper.properties gradle/wrapper/
+      - name: Build debug APK with pinned Gradle wrapper
+        run: ./gradlew --no-daemon assembleDebug
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
@@ -47,6 +55,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "Gradle wrapper is already up to date."
           else
-            git commit -m "Add Gradle wrapper for Android Studio"
+            git commit -m "Pin Gradle wrapper to 8.13"
             git push
           fi
