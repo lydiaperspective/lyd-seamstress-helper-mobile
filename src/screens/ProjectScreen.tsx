@@ -118,7 +118,7 @@ export function ProjectScreen() {
             </View>)}</View>
           </View>}
 
-          {active !== 'inspiration' && <View style={styles.featurePanel}>
+          {active !== 'inspiration' && <><View style={styles.featurePanel}>
             <View style={styles.panelTop}>
               <View style={styles.panelIcon}><Text style={styles.panelIconText}>{selected.symbol}</Text></View>
               <View style={styles.panelHeading}>
@@ -143,7 +143,7 @@ export function ProjectScreen() {
           <View style={styles.tip}>
             <Text style={styles.tipLabel}>DESIGN PRINCIPLE</Text>
             <Text style={styles.tipText}>Your project stays together from first reference to finished pattern.</Text>
-          </View>}
+          </View></>}
         </ScrollView>
       </View>
 
