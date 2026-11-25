@@ -5,7 +5,7 @@ Seamwork Studio is a native Android application using **Kotlin and Jetpack Compo
 ## Open in Android Studio
 
 1. Open the repository on GitHub and select **Actions**.
-2. Run **Build native Android app** using **Run workflow**. This generates the Gradle wrapper, builds a debug APK, and saves the APK as an artifact.
+2. Run **Build native Android app** using **Run workflow**. It creates and commits the Gradle 8.13 wrapper, builds a debug APK, and saves the APK as an artifact. Gradle 8.13 is intentionally pinned because Android Gradle Plugin 8.13.2 is not compatible with Gradle 9.6.
 3. Clone or download the updated repository after the workflow completes.
 4. In Android Studio, choose **Open** and select the repository root (the folder containing `settings.gradle.kts`).
 5. Install Android SDK Platform 36 when prompted and use JDK 17.
