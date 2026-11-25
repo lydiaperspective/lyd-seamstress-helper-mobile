@@ -1,15 +1,20 @@
-# Android Studio testing
+# Native Android Studio project
 
-This is an Expo-managed app. The native Gradle project is generated from the app configuration by GitHub Actions.
+Seamwork Studio is a native Android application using **Kotlin and Jetpack Compose**.
 
-1. Open the repository on GitHub and select **Actions**.
-2. Select **Prepare Android Studio project**.
-3. Select **Run workflow** on the `main` branch.
-4. Wait for the workflow to finish. It runs Expo prebuild, builds a debug APK, and commits the generated `android/` directory.
-5. Pull the latest `main` branch or download the updated repository ZIP.
-6. In Android Studio, choose **Open** and select the repository's **android** folder.
-7. Allow Gradle sync to finish. Connect the Android 16 tablet with USB debugging enabled, select it as the run target, and press **Run**.
+## Open in Android Studio
 
-The workflow run also has a downloadable `seamwork-studio-debug-apk` artifact for installing the test APK directly.
+1. Clone or download this repository.
+2. In Android Studio, choose **Open** and select the repository root (the folder containing `settings.gradle.kts`).
+3. Install Android SDK Platform 36 when prompted.
+4. Use JDK 17 for Gradle and allow Gradle sync to finish.
+5. Select an Android 16 emulator or connect your tablet with USB debugging enabled.
+6. Press **Run**.
 
-Use JDK 17. Accept Android Studio prompts to install any missing Android SDK or Gradle components. Test S Pen input and photo access on the actual tablet; those behaviors cannot be verified by a cloud build alone.
+The application module is `app`; application ID: `com.lydiaperspective.seamworkstudio`.
+
+## Current state
+
+The Compose app includes a tablet-oriented project dashboard, create/delete interactions, and navigation into all five garment workspaces. Project data currently lives in Compose state and does not persist across restarts. Inspiration management, S Pen canvas tools, vector pattern drafting, fabric nesting and PDF export remain future implementation work.
+
+The old Expo/React Native prototype is retained as a legacy reference. Android Studio should open the repository root and build the native `app` module.
