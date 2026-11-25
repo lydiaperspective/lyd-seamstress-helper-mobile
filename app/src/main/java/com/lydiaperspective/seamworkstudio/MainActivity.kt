@@ -80,7 +80,7 @@ private fun ProjectHome(
         Spacer(Modifier.height(16.dp))
         LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             items(projects, key = { it.id }) { project ->
-                Card(Modifier.fillMaxWidth(), onClick = { open(project) }) {
+                Card(onClick = { open(project) }, modifier = Modifier.fillMaxWidth()) {
                     Row(Modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(project.name, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
                         TextButton(onClick = { delete(project) }) { Text("Delete") }
@@ -100,7 +100,7 @@ private fun WorkspaceHome(project: GarmentProject, back: () -> Unit, open: (Stri
         Spacer(Modifier.height(20.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             workspaces.forEach { workspace ->
-                Card(Modifier.weight(1f).height(170.dp), onClick = { open(workspace) }) {
+                Card(onClick = { open(workspace) }, modifier = Modifier.weight(1f).height(170.dp)) {
                     Column(Modifier.fillMaxSize().padding(14.dp), verticalArrangement = Arrangement.SpaceBetween) {
                         Text(workspace, style = MaterialTheme.typography.titleMedium)
                         Text("Open  →", color = MaterialTheme.colorScheme.primary)
