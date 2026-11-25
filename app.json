@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "Seamwork Studio",
+    "slug": "seamwork-studio",
+    "version": "0.1.0",
+    "orientation": "landscape",
+    "userInterfaceStyle": "light",
+    "scheme": "seamwork",
+    "android": {
+      "package": "com.lydiaperspective.seamworkstudio",
+      "adaptiveIcon": {
+        "backgroundColor": "#F4EFE7"
+      }
+    },
+    "plugins": [
+      "expo-sqlite"
+    ],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}
