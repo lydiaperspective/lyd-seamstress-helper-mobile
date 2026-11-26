@@ -272,6 +272,33 @@ fun PatternDesignerWorkspace(
                     }
                 }
             }
+            if (pointMenuIndex in draftPoints.indices) {
+                val point = draftPoints[pointMenuIndex]
+                val density = LocalDensity.current
+                val menuX = (maxWidth / 2 + with(density) { (pan.x + point.x * zoom).toDp() } + 14.dp).coerceIn(8.dp, maxWidth - 176.dp)
+                val menuY = (maxHeight / 2 + with(density) { (pan.y + point.y * zoom).toDp() } + 14.dp).coerceIn(72.dp, maxHeight - 220.dp)
+                Surface(Modifier.offset(x = menuX, y = menuY).width(168.dp), shape = MaterialTheme.shapes.medium, tonalElevation = 6.dp, shadowElevation = 8.dp) {
+                    Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text("Point ${pointMenuIndex + 1}", style = MaterialTheme.typography.labelMedium)
+                        TextButton(onClick = {
+                            val removed = pointMenuIndex
+                            val updatedPoints = draftPoints.toMutableList().also { it.removeAt(removed) }
+                            val updatedEdges = draftEdges.mapNotNull { (a, b) ->
+                                if (a == removed || b == removed) null else (if (a > removed) a - 1 else a) to (if (b > removed) b - 1 else b)
+                            }.toSet()
+                            draftPoints = updatedPoints
+                            draftEdges = updatedEdges
+                            saveGeometry(updatedPoints, updatedEdges)
+                            selectedPoint = -1
+                            pointMenuIndex = -1
+                        }, modifier = Modifier.fillMaxWidth()) { Text("Delete point") }
+                        TextButton(onClick = { selectedPoint = pointMenuIndex; mode = "EDIT"; pointMenuIndex = -1 }, modifier = Modifier.fillMaxWidth()) { Text("Edit point") }
+                        TextButton(onClick = { selectedPoint = pointMenuIndex; pendingConnectionAction = "DISCONNECT"; mode = "EDIT"; pointMenuIndex = -1 }, modifier = Modifier.fillMaxWidth()) { Text("Disconnect point") }
+                        TextButton(onClick = { selectedPoint = pointMenuIndex; pendingConnectionAction = "CONNECT"; mode = "EDIT"; pointMenuIndex = -1 }, modifier = Modifier.fillMaxWidth()) { Text("Connect point") }
+                        TextButton(onClick = { pointMenuIndex = -1 }, modifier = Modifier.fillMaxWidth()) { Text("Cancel") }
+                    }
+                }
+            }
             Column(Modifier.align(Alignment.TopStart).padding(12.dp)) {
                 TextButton(onClick = back, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)) {
                     Text("‹  ${project.name}")
@@ -337,8 +364,12 @@ fun PatternDesignerWorkspace(
                 FilterChip(selected = mode == "EDIT", onClick = { mode = "EDIT" }, label = { Text("Edit points") })
             }
             Text(
-                if (mode == "ADD") "Tap the drafting plane to add vertices to the selected piece."
-                else "Tap a vertex to select it, then drag it to adjust its position.",
+                when (pendingConnectionAction) {
+                    "CONNECT" -> "Tap the point you want to connect to."
+                    "DISCONNECT" -> "Tap the point you want to disconnect from."
+                    else -> if (mode == "ADD") "Tap the drafting plane to add vertices. Double-tap a point for options."
+                    else "Tap a vertex to select or drag it. Double-tap for point options."
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -353,10 +384,16 @@ fun PatternDesignerWorkspace(
                 ) { Text(if (selectedPiece.isClosed) "Reopen path" else "Close shape") }
                 OutlinedButton(
                     onClick = {
-                        val updated = draftPoints.toMutableList().also { it.removeAt(selectedPoint) }
+                        val removed = selectedPoint
+                        val updated = draftPoints.toMutableList().also { it.removeAt(removed) }
+                        val updatedEdges = draftEdges.mapNotNull { (a, b) ->
+                            if (a == removed || b == removed) null else (if (a > removed) a - 1 else a) to (if (b > removed) b - 1 else b)
+                        }.toSet()
                         draftPoints = updated
+                        draftEdges = updatedEdges
                         selectedPoint = -1
-                        savePoints(updated)
+                        pointMenuIndex = -1
+                        saveGeometry(updated, updatedEdges)
                     },
                     enabled = selectedPoint in draftPoints.indices,
                     modifier = Modifier.fillMaxWidth()
