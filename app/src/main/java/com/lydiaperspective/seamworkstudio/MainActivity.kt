@@ -41,6 +41,7 @@ private fun SeamworkApp(database: SeamworkDatabase) {
     var activeProject by remember { mutableStateOf<GarmentProject?>(null) }
     var activeWorkspace by remember { mutableStateOf<String?>(null) }
     var showCreate by remember { mutableStateOf(false) }
+    var projectPendingDelete by remember { mutableStateOf<GarmentProject?>(null) }
 
     BackHandler(enabled = showCreate || activeWorkspace != null || activeProject != null) {
         when {
@@ -61,7 +62,7 @@ private fun SeamworkApp(database: SeamworkDatabase) {
                 activeProject == null -> ProjectHome(
                     projects = projects,
                     create = { showCreate = true },
-                    delete = { project -> scope.launch { database.projectDao().deleteProject(project.id) } },
+                    delete = { project -> projectPendingDelete = project },
                     open = { activeProject = it }
                 )
                 activeWorkspace == null -> WorkspaceHome(
@@ -85,6 +86,24 @@ private fun SeamworkApp(database: SeamworkDatabase) {
                     back = { activeWorkspace = null }
                 )
                 else -> WorkspacePage(activeProject!!, activeWorkspace!!) { activeWorkspace = null }
+            }
+            if (projectPendingDelete != null) {
+                val project = projectPendingDelete!!
+                AlertDialog(
+                    onDismissRequest = { projectPendingDelete = null },
+                    title = { Text("Delete project?") },
+                    text = { Text("“" + project.name + "” and its saved project data will be deleted. This cannot be undone.") },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            scope.launch { database.projectDao().deleteProject(project.id) }
+                            if (activeProject?.id == project.id) activeProject = null
+                            projectPendingDelete = null
+                        }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
+                            Text("Delete")
+                        }
+                    },
+                    dismissButton = { TextButton(onClick = { projectPendingDelete = null }) { Text("Cancel") } }
+                )
             }
             if (showCreate) {
                 var name by remember { mutableStateOf("") }
@@ -169,6 +188,7 @@ private fun LegacyInspirationWorkspace(
     var showLinkDialog by remember { mutableStateOf(false) }
     var linkTitle by remember { mutableStateOf("") }
     var linkAddress by remember { mutableStateOf("") }
+    var itemPendingRemoval by remember { mutableStateOf<InspirationItem?>(null) }
 
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) {
@@ -225,14 +245,31 @@ private fun LegacyInspirationWorkspace(
                                     context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(item.uri)))
                                 }
                             }) { Text("Open") }
-                            TextButton(onClick = {
-                                scope.launch { database.inspirationDao().delete(item.id) }
-                            }) { Text("Remove") }
+                            TextButton(onClick = { itemPendingRemoval = item }) { Text("Remove") }
                         }
                     }
                 }
             }
         }
+    }
+
+    if (itemPendingRemoval != null) {
+        val item = itemPendingRemoval!!
+        AlertDialog(
+            onDismissRequest = { itemPendingRemoval = null },
+            title = { Text("Remove reference?") },
+            text = { Text("“" + item.title + "” will be removed from this inspiration board.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        scope.launch { database.inspirationDao().delete(item.id) }
+                        itemPendingRemoval = null
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text("Remove") }
+            },
+            dismissButton = { TextButton(onClick = { itemPendingRemoval = null }) { Text("Cancel") } }
+        )
     }
 
     if (showLinkDialog) {
