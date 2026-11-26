@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
@@ -40,6 +41,14 @@ private fun SeamworkApp(database: SeamworkDatabase) {
     var activeProject by remember { mutableStateOf<GarmentProject?>(null) }
     var activeWorkspace by remember { mutableStateOf<String?>(null) }
     var showCreate by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = showCreate || activeWorkspace != null || activeProject != null) {
+        when {
+            showCreate -> showCreate = false
+            activeWorkspace != null -> activeWorkspace = null
+            activeProject != null -> activeProject = null
+        }
+    }
 
     MaterialTheme(colorScheme = lightColorScheme(
         primary = androidx.compose.ui.graphics.Color(0xFF765B49),
