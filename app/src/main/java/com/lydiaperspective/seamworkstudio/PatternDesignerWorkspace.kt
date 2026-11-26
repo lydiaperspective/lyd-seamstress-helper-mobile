@@ -26,9 +26,11 @@ import com.lydiaperspective.seamworkstudio.data.SeamworkDatabase
 import kotlinx.coroutines.launch
 import kotlin.math.ceil
 import kotlin.math.hypot
+import kotlin.math.cos
+import kotlin.math.sin
 import kotlin.math.roundToInt
 
-private data class PatternGeometry(val points: List<Offset>, val edges: Set<Pair<Int, Int>>)
+private data class PatternGeometry(val points: List<Offset>, val edges: Set<Pair<Int, Int>>, val angles: Map<Pair<Int, Int>, Pair<Float, Float>>)
 
 private fun normalizedEdge(a: Int, b: Int): Pair<Int, Int> = if (a < b) a to b else b to a
 
@@ -37,29 +39,36 @@ private fun defaultEdges(count: Int, closed: Boolean): Set<Pair<Int, Int>> = bui
     if (closed && count > 2) add(0 to (count - 1))
 }
 
-private fun encodeGeometry(points: List<Offset>, edges: Set<Pair<Int, Int>>): String {
+private fun defaultAngle(a: Offset, b: Offset): Float =
+    Math.toDegrees(kotlin.math.atan2((b.y - a.y).toDouble(), (b.x - a.x).toDouble())).toFloat()
+
+private fun encodeGeometry(points: List<Offset>, edges: Set<Pair<Int, Int>>, angles: Map<Pair<Int, Int>, Pair<Float, Float>>): String {
     val p = points.joinToString(";") { "${it.x},${it.y}" }
     val e = edges.sortedWith(compareBy<Pair<Int, Int>> { it.first }.thenBy { it.second }).joinToString(";") { "${it.first},${it.second}" }
-    return "G2|$p|$e"
+    val t = angles.entries.sortedWith(compareBy({ it.key.first }, { it.key.second })).joinToString(";") { "${it.key.first},${it.key.second},${it.value.first},${it.value.second}" }
+    return "G3|$p|$e|$t"
 }
 
 private fun decodeGeometry(data: String, closed: Boolean): PatternGeometry {
-    if (data.startsWith("G2|")) {
-        val sections = data.split("|", limit = 3)
+    val v3 = data.startsWith("G3|")
+    if (data.startsWith("G2|") || v3) {
+        val sections = data.split("|", limit = if (v3) 4 else 3)
         val points = sections.getOrNull(1).orEmpty().split(";").filter { it.isNotBlank() }.mapNotNull { item ->
             val pair = item.split(","); if (pair.size != 2) null else runCatching { Offset(pair[0].toFloat(), pair[1].toFloat()) }.getOrNull()
         }
         val edges = sections.getOrNull(2).orEmpty().split(";").filter { it.isNotBlank() }.mapNotNull { item ->
             val pair = item.split(","); if (pair.size != 2) null else runCatching { normalizedEdge(pair[0].toInt(), pair[1].toInt()) }.getOrNull()
         }.filter { it.first in points.indices && it.second in points.indices && it.first != it.second }.toSet()
-        return PatternGeometry(points, edges)
+        val angles = if (v3) sections.getOrNull(3).orEmpty().split(";").filter { it.isNotBlank() }.mapNotNull { item ->
+            val v = item.split(","); if (v.size != 4) null else runCatching { normalizedEdge(v[0].toInt(), v[1].toInt()) to (v[2].toFloat() to v[3].toFloat()) }.getOrNull()
+        }.toMap() else emptyMap()
+        return PatternGeometry(points, edges, angles)
     }
     val points = if (data.isBlank()) emptyList() else data.split(";").mapNotNull { item ->
         val pair = item.split(","); if (pair.size != 2) null else runCatching { Offset(pair[0].toFloat(), pair[1].toFloat()) }.getOrNull()
     }
-    return PatternGeometry(points, defaultEdges(points.size, closed))
+    return PatternGeometry(points, defaultEdges(points.size, closed), emptyMap())
 }
-
 @Composable
 fun PatternDesignerWorkspace(
     project: GarmentProject,
