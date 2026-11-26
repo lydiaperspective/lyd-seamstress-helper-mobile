@@ -218,7 +218,7 @@ private fun SketchPageEditor(page: SketchPage, save: suspend (SketchPage) -> Uni
                                 do {
                                     val event = awaitPointerEvent()
                                     val pressed = event.changes.filter { it.pressed }
-                                    if (pressed.size >= 2 || (!penOnly && pressed.firstOrNull()?.type == PointerType.Touch)) {
+                                    if (pressed.size >= 2 || pressed.firstOrNull()?.type == PointerType.Touch) {
                                         val zoomChange = event.calculateZoom()
                                         val panChange = event.calculatePan()
                                         zoom = (zoom * zoomChange).coerceIn(1f, 5f)
