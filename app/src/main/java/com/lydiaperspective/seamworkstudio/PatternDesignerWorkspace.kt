@@ -329,7 +329,46 @@ fun PatternDesignerWorkspace(
                         TextButton(onClick = { selectedPoint = pointMenuIndex; mode = "EDIT"; pointMenuIndex = -1 }, modifier = Modifier.fillMaxWidth()) { Text("Edit point") }
                         TextButton(onClick = { selectedPoint = pointMenuIndex; pendingConnectionAction = "DISCONNECT"; mode = "EDIT"; pointMenuIndex = -1 }, modifier = Modifier.fillMaxWidth()) { Text("Disconnect point") }
                         TextButton(onClick = { selectedPoint = pointMenuIndex; pendingConnectionAction = "CONNECT"; mode = "EDIT"; pointMenuIndex = -1 }, modifier = Modifier.fillMaxWidth()) { Text("Connect point") }
+                        TextButton(onClick = { angleEditorIndex = pointMenuIndex; pointMenuIndex = -1 }, modifier = Modifier.fillMaxWidth()) { Text("Change point angle") }
                         TextButton(onClick = { pointMenuIndex = -1 }, modifier = Modifier.fillMaxWidth()) { Text("Cancel") }
+                    }
+                }
+            }
+            if (angleEditorIndex in draftPoints.indices) {
+                val pointIndex = angleEditorIndex
+                val connectedEdges = draftEdges.filter { pointIndex == it.first || pointIndex == it.second }
+                Surface(Modifier.align(Alignment.Center).widthIn(max = 360.dp).fillMaxWidth(0.9f), shape = MaterialTheme.shapes.large, tonalElevation = 8.dp, shadowElevation = 10.dp) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("Point ${pointIndex + 1} · Connection angles", style = MaterialTheme.typography.titleMedium)
+                        Text("Adjust each connected segment independently to shape a smooth curve through this point.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (connectedEdges.isEmpty()) { Text("This point has no connections yet.", style = MaterialTheme.typography.bodySmall) }
+                        else connectedEdges.forEach { edge ->
+                            val atStart = edge.first == pointIndex
+                            val other = if (atStart) edge.second else edge.first
+                            val defaultStart = defaultAngle(draftPoints[edge.first], draftPoints[edge.second])
+                            val defaultEnd = defaultAngle(draftPoints[edge.second], draftPoints[edge.first])
+                            val pair = draftAngles[edge] ?: (defaultStart to defaultEnd)
+                            val current = if (atStart) pair.first else pair.second
+                            Column {
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text("To point ${other + 1}", style = MaterialTheme.typography.labelLarge)
+                                    Text("${current.roundToInt()}°", style = MaterialTheme.typography.labelMedium)
+                                }
+                                Slider(value = current.coerceIn(-180f, 180f), onValueChange = { value ->
+                                    val nextPair = if (atStart) value to pair.second else pair.first to value
+                                    val updated = draftAngles + (edge to nextPair)
+                                    draftAngles = updated
+                                    saveGeometry(draftPoints, draftEdges, updated)
+                                }, valueRange = -180f..180f)
+                                TextButton(onClick = {
+                                    val nextPair = if (atStart) defaultStart to pair.second else pair.first to defaultEnd
+                                    val updated = draftAngles + (edge to nextPair)
+                                    draftAngles = updated
+                                    saveGeometry(draftPoints, draftEdges, updated)
+                                }, modifier = Modifier.align(Alignment.End)) { Text("Reset this angle") }
+                            }
+                        }
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { TextButton(onClick = { angleEditorIndex = -1 }) { Text("Done") } }
                     }
                 }
             }
