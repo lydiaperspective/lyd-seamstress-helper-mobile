@@ -4,6 +4,8 @@ import android.content.Context
 import android.graphics.Canvas as AndroidCanvas
 import android.graphics.Color as AndroidColor
 import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
 import android.graphics.Path as NativePath
 import android.view.View
 import androidx.compose.ui.viewinterop.AndroidView
@@ -24,6 +26,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Paint as ComposePaint
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -71,6 +76,7 @@ private class LiveInkView(context: Context) : View(context) {
         if (points.isEmpty()) return
         paint.color = inkColor
         paint.strokeWidth = inkWidth
+        paint.xfermode = if (inkColor == AndroidColor.TRANSPARENT) PorterDuffXfermode(PorterDuff.Mode.CLEAR) else null
         val path = NativePath().apply {
             moveTo(points.first().x * width, points.first().y * height)
             points.drop(1).forEach { lineTo(it.x * width, it.y * height) }
@@ -266,7 +272,7 @@ private fun SketchPageEditor(page: SketchPage, save: suspend (SketchPage) -> Uni
                                         (pointer.position.y / size.height).coerceIn(0f, 1f)
                                     )
                                 )
-                                val liveColor = if (tool == "ERASER") AndroidColor.WHITE else brushColor
+                                val liveColor = if (tool == "ERASER") AndroidColor.TRANSPARENT else brushColor
                                 val liveWidth = if (tool == "ERASER") brushSize * 4f else brushSize
                                 liveInkView.value?.showStroke(liveColor, liveWidth, points)
                                 var active = true
@@ -292,7 +298,7 @@ private fun SketchPageEditor(page: SketchPage, save: suspend (SketchPage) -> Uni
                                 }
                                 if (points.isNotEmpty()) {
                                     undoHistory = undoHistory + listOf(strokes)
-                                    val color = if (tool == "ERASER") AndroidColor.WHITE else brushColor
+                                    val color = if (tool == "ERASER") AndroidColor.TRANSPARENT else brushColor
                                     val width = if (tool == "ERASER") brushSize * 4f else brushSize
                                     strokes = strokes + InkStroke(color, width, points.toList())
                                     redoHistory = emptyList()
@@ -342,18 +348,35 @@ private fun SketchPageEditor(page: SketchPage, save: suspend (SketchPage) -> Uni
                                 }
                             }
                         }
+                        // Keep ink on its own compositing layer so erasing clears ink only,
+                        // never the paper, grid, or dot background drawn above.
+                        val inkLayer = drawContext.canvas.saveLayer(
+                            Rect(0f, 0f, size.width, size.height), ComposePaint()
+                        )
                         strokes.forEach { stroke ->
+                            val erasing = stroke.color == AndroidColor.TRANSPARENT
+                            val blend = if (erasing) BlendMode.Clear else BlendMode.SrcOver
                             if (stroke.points.size == 1) {
-                                drawCircle(Color(stroke.color), stroke.width.dp.toPx() / 2f,
-                                    Offset(stroke.points[0].x * size.width, stroke.points[0].y * size.height))
+                                drawCircle(
+                                    color = if (erasing) Color.Transparent else Color(stroke.color),
+                                    radius = stroke.width.dp.toPx() / 2f,
+                                    center = Offset(stroke.points[0].x * size.width, stroke.points[0].y * size.height),
+                                    blendMode = blend
+                                )
                             } else {
                                 val path = Path().apply {
                                     moveTo(stroke.points.first().x * size.width, stroke.points.first().y * size.height)
                                     stroke.points.drop(1).forEach { lineTo(it.x * size.width, it.y * size.height) }
                                 }
-                                drawPath(path, Color(stroke.color), style = Stroke(stroke.width.dp.toPx(), cap = StrokeCap.Round))
+                                drawPath(
+                                    path,
+                                    if (erasing) Color.Transparent else Color(stroke.color),
+                                    style = Stroke(stroke.width.dp.toPx(), cap = StrokeCap.Round),
+                                    blendMode = blend
+                                )
                             }
                         }
+                        drawContext.canvas.restoreToCount(inkLayer)
                     }
                     AndroidView(
                         factory = { context -> LiveInkView(context).also { liveInkView.value = it } },
