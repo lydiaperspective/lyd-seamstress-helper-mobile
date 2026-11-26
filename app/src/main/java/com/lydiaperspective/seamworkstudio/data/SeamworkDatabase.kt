@@ -88,7 +88,7 @@ interface InspirationDao {
 
 @Dao
 interface SketchPageDao {
-    @Query("SELECT * FROM sketch_pages WHERE projectId = :projectId ORDER BY updatedAt DESC, id DESC")
+    @Query("SELECT * FROM sketch_pages WHERE projectId = :projectId ORDER BY id ASC")
     fun observePages(projectId: Long): Flow<List<SketchPage>>
 
     @Insert
