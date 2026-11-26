@@ -192,20 +192,21 @@ private fun SketchPageEditor(
             FilterChip(selected = tool == "PEN", onClick = { tool = "PEN" }, label = { Text("Pen") })
             FilterChip(selected = tool == "ERASER", onClick = { tool = "ERASER" }, label = { Text("Eraser") })
             TextButton(onClick = {
-                if (strokes.isNotEmpty()) {
-                    undoHistory = undoHistory + listOf(strokes)
-                    strokes = strokes.dropLast(1)
-                    redoHistory = emptyList()
-                }
-            }, enabled = strokes.isNotEmpty()) { Text("Undo") }
-            TextButton(onClick = {
                 val previous = undoHistory.lastOrNull()
                 if (previous != null) {
                     redoHistory = redoHistory + listOf(strokes)
                     strokes = previous
                     undoHistory = undoHistory.dropLast(1)
                 }
-            }, enabled = undoHistory.isNotEmpty()) { Text("Redo") }
+            }, enabled = undoHistory.isNotEmpty()) { Text("Undo") }
+            TextButton(onClick = {
+                val next = redoHistory.lastOrNull()
+                if (next != null) {
+                    undoHistory = undoHistory + listOf(strokes)
+                    strokes = next
+                    redoHistory = redoHistory.dropLast(1)
+                }
+            }, enabled = redoHistory.isNotEmpty()) { Text("Redo") }
             TextButton(onClick = { zoom = 1f; pan = Offset.Zero }) { Text("Reset view") }
         }
         Row(
