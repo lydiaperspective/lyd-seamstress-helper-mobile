@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalDensity
 import com.lydiaperspective.seamworkstudio.data.GarmentProject
 import com.lydiaperspective.seamworkstudio.data.PatternPiece
 import com.lydiaperspective.seamworkstudio.data.SeamworkDatabase
@@ -109,7 +110,19 @@ fun PatternDesignerWorkspace(
             Canvas(
                 Modifier.fillMaxSize()
                     .pointerInput(mode, selectedPiece?.id, selectedPiece?.isClosed, zoom, pan) {
-                        detectTapGestures { tap ->
+                        detectTapGestures(onDoubleTap = { tap ->
+                            if (mode != "ADD") {
+                                val nearest = currentDraftPoints.indices.minByOrNull { index ->
+                                    val p = currentDraftPoints[index]
+                                    hypot((size.width / 2f + pan.x + p.x * zoom) - tap.x, (size.height / 2f + pan.y + p.y * zoom) - tap.y)
+                                }
+                                val hit = nearest?.takeIf { index ->
+                                    val p = currentDraftPoints[index]
+                                    hypot((size.width / 2f + pan.x + p.x * zoom) - tap.x, (size.height / 2f + pan.y + p.y * zoom) - tap.y) < 32f
+                                } ?: -1
+                                if (hit >= 0) { selectedPoint = hit; pointMenuIndex = hit; pendingConnectionAction = null }
+                            }
+                        }, onTap = { tap ->
                             val world = Offset(
                                 (tap.x - size.width / 2f - pan.x) / zoom,
                                 (tap.y - size.height / 2f - pan.y) / zoom
@@ -148,7 +161,8 @@ fun PatternDesignerWorkspace(
                                     selectedPoint = target
                                 }
                             }
-                        }
+                            }
+                        )
                     }
                     .pointerInput(mode, selectedPiece?.id, selectedPiece?.isClosed, zoom, pan) {
                         var movingIndex = -1
