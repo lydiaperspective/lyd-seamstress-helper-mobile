@@ -86,6 +86,8 @@ fun PatternDesignerWorkspace(
     var mode by remember { mutableStateOf("ADD") }
     var selectedPoint by remember { mutableIntStateOf(-1) }
     var draftEdges by remember(selectedPiece?.id) { mutableStateOf(selectedPiece?.let { decodeGeometry(it.pointsData, it.isClosed).edges } ?: emptySet()) }
+    var draftAngles by remember(selectedPiece?.id) { mutableStateOf(selectedPiece?.let { decodeGeometry(it.pointsData, it.isClosed).angles } ?: emptyMap()) }
+    var angleEditorIndex by remember { mutableIntStateOf(-1) }
     var pointMenuIndex by remember { mutableIntStateOf(-1) }
     var pendingConnectionAction by remember { mutableStateOf<String?>(null) }
     var zoom by remember { mutableFloatStateOf(2.5f) }
@@ -99,15 +101,17 @@ fun PatternDesignerWorkspace(
         val geometry = selectedPiece?.let { decodeGeometry(it.pointsData, it.isClosed) }
         draftPoints = geometry?.points ?: emptyList()
         draftEdges = geometry?.edges ?: emptySet()
+        draftAngles = geometry?.angles ?: emptyMap()
+        angleEditorIndex = -1
         selectedPoint = -1
         pointMenuIndex = -1
         pendingConnectionAction = null
     }
 
-    fun saveGeometry(points: List<Offset>, edges: Set<Pair<Int, Int>>) {
+    fun saveGeometry(points: List<Offset>, edges: Set<Pair<Int, Int>>, angles: Map<Pair<Int, Int>, Pair<Float, Float>> = draftAngles) {
         val piece = selectedPiece ?: return
         scope.launch {
-            dao.updatePiece(piece.copy(pointsData = encodeGeometry(points, edges), updatedAt = System.currentTimeMillis()))
+            dao.updatePiece(piece.copy(pointsData = encodeGeometry(points, edges, angles), updatedAt = System.currentTimeMillis()))
         }
     }
 
