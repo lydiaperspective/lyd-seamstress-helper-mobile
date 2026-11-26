@@ -129,6 +129,16 @@ fun PatternDesignerWorkspace(
                 ) { Text(if (selectedPiece.isClosed) "Reopen path" else "Close shape") }
                 OutlinedButton(
                     onClick = {
+                        val updated = draftPoints.toMutableList().also { it.removeAt(selectedPoint) }
+                        draftPoints = updated
+                        selectedPoint = -1
+                        savePoints(updated)
+                    },
+                    enabled = selectedPoint in draftPoints.indices,
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Remove selected point") }
+                OutlinedButton(
+                    onClick = {
                         scope.launch { dao.deletePiece(selectedPiece.id) }
                         selectedId = null
                     },
@@ -192,12 +202,12 @@ fun PatternDesignerWorkspace(
                                         )
                                     } ?: -1
                                     if (movingIndex >= 0) {
-                                        val point = draftPoints[movingIndex]
+                                        val point = currentDraftPoints[movingIndex]
                                         val distance = hypot(
                                             (size.width / 2f + pan.x + point.x * zoom) - start.x,
                                             (size.height / 2f + pan.y + point.y * zoom) - start.y
                                         )
-                                        if (distance > 30f) movingIndex = -1
+                                        if (distance > 30f) movingIndex = -1 else selectedPoint = movingIndex
                                     }
                                 }
                             },
