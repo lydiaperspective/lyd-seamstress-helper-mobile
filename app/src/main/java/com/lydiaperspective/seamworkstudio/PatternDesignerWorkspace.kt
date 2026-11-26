@@ -18,7 +18,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.unit.dp
 import com.lydiaperspective.seamworkstudio.data.GarmentProject
 import com.lydiaperspective.seamworkstudio.data.PatternPiece
@@ -58,6 +57,7 @@ fun PatternDesignerWorkspace(
     var zoom by remember { mutableFloatStateOf(2.5f) }
     var pan by remember { mutableStateOf(Offset.Zero) }
     var showNewPiece by remember { mutableStateOf(false) }
+    var showTools by remember { mutableStateOf(true) }
     var newPieceName by remember { mutableStateOf("") }
     val currentDraftPoints by rememberUpdatedState(draftPoints)
 
@@ -73,93 +73,11 @@ fun PatternDesignerWorkspace(
         }
     }
 
-    Row(
+    Box(
         Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
             .windowInsetsPadding(WindowInsets.systemBars)
     ) {
-        Column(
-            Modifier.width(230.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surface)
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(9.dp)
-        ) {
-            TextButton(onClick = back) { Text("‹  ${project.name}") }
-            Text("PATTERN PIECES", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-            Button(onClick = { newPieceName = ""; showNewPiece = true }, modifier = Modifier.fillMaxWidth()) {
-                Text("+ New piece")
-            }
-            LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                items(pieces, key = { it.id }) { piece ->
-                    val active = piece.id == (selectedPiece?.id)
-                    OutlinedButton(
-                        onClick = { selectedId = piece.id },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = if (active) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
-                        ),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp)
-                    ) {
-                        Column(Modifier.fillMaxWidth()) {
-                            Text(piece.name, maxLines = 1)
-                            Text(
-                                "${decodePatternPoints(piece.pointsData).size} points" + if (piece.isClosed) " · Closed" else " · Open",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-            }
-            HorizontalDivider()
-            Text("EDITING", style = MaterialTheme.typography.labelLarge)
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                FilterChip(selected = mode == "ADD", onClick = { mode = "ADD"; selectedPoint = -1 }, label = { Text("Add points") })
-                FilterChip(selected = mode == "EDIT", onClick = { mode = "EDIT" }, label = { Text("Edit points") })
-            }
-            Text(
-                if (mode == "ADD") "Tap the drafting plane to add vertices to the selected piece."
-                else "Tap a vertex to select it, then drag it to adjust its position.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            if (selectedPiece != null) {
-                OutlinedButton(
-                    onClick = {
-                        val updated = selectedPiece.copy(isClosed = !selectedPiece.isClosed, updatedAt = System.currentTimeMillis())
-                        scope.launch { dao.updatePiece(updated) }
-                    },
-                    enabled = draftPoints.size >= 3 || selectedPiece.isClosed,
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text(if (selectedPiece.isClosed) "Reopen path" else "Close shape") }
-                OutlinedButton(
-                    onClick = {
-                        val updated = draftPoints.toMutableList().also { it.removeAt(selectedPoint) }
-                        draftPoints = updated
-                        selectedPoint = -1
-                        savePoints(updated)
-                    },
-                    enabled = selectedPoint in draftPoints.indices,
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text("Remove selected point") }
-                OutlinedButton(
-                    onClick = {
-                        scope.launch { dao.deletePiece(selectedPiece.id) }
-                        selectedId = null
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text("Delete piece") }
-            }
-            HorizontalDivider()
-            Text("VIEW", style = MaterialTheme.typography.labelLarge)
-            Text("${(zoom / 2.5f * 100).roundToInt()}% zoom", style = MaterialTheme.typography.bodySmall)
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                OutlinedButton(onClick = { zoom = (zoom / 1.25f).coerceAtLeast(0.25f) }) { Text("−") }
-                OutlinedButton(onClick = { zoom = (zoom * 1.25f).coerceAtMost(20f) }) { Text("+") }
-                OutlinedButton(onClick = { zoom = 2.5f; pan = Offset.Zero }) { Text("Reset") }
-            }
-            Text("Grid: 10 mm", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-
-        Box(Modifier.weight(1f).fillMaxHeight().background(Color(0xFFF1EEE9))) {
+        Box(Modifier.fillMaxSize().background(Color(0xFFF1EEE9))) {
             Canvas(
                 Modifier.fillMaxSize()
                     .pointerInput(mode, selectedPiece?.id, selectedPiece?.isClosed, zoom, pan) {
@@ -222,9 +140,6 @@ fun PatternDesignerWorkspace(
                                         (change.position.y - size.height / 2f - pan.y) / zoom
                                     )
                                     draftPoints = updated
-                                    change.consume()
-                                } else {
-                                    pan += change.positionChange()
                                     change.consume()
                                 }
                             },
@@ -306,12 +221,104 @@ fun PatternDesignerWorkspace(
                 Text("Infinite drafting plane · coordinates in mm", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Text(
-                "Pan and pinch to navigate · 10 mm grid",
+                "Use two pointers to pan and pinch · 10 mm grid",
                 Modifier.align(Alignment.BottomStart).padding(12.dp),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+        if (!showTools) {
+            Button(
+                onClick = { showTools = true },
+                modifier = Modifier.align(Alignment.TopEnd).padding(12.dp)
+            ) { Text("Tools  ☰") }
+        }
+        if (showTools) Column(
+            Modifier.align(Alignment.CenterEnd).width(260.dp).fillMaxHeight()
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.97f))
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(9.dp)
+        ) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = back) { Text("‹  ${project.name}") }
+                TextButton(onClick = { showTools = false }) { Text("Hide") }
+            }
+            Text("PATTERN PIECES", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            Button(onClick = { newPieceName = ""; showNewPiece = true }, modifier = Modifier.fillMaxWidth()) {
+                Text("+ New piece")
+            }
+            LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                items(pieces, key = { it.id }) { piece ->
+                    val active = piece.id == (selectedPiece?.id)
+                    OutlinedButton(
+                        onClick = { selectedId = piece.id },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = if (active) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
+                        ),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp)
+                    ) {
+                        Column(Modifier.fillMaxWidth()) {
+                            Text(piece.name, maxLines = 1)
+                            Text(
+                                "${decodePatternPoints(piece.pointsData).size} points" + if (piece.isClosed) " · Closed" else " · Open",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+            HorizontalDivider()
+            Text("EDITING", style = MaterialTheme.typography.labelLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FilterChip(selected = mode == "ADD", onClick = { mode = "ADD"; selectedPoint = -1 }, label = { Text("Add points") })
+                FilterChip(selected = mode == "EDIT", onClick = { mode = "EDIT" }, label = { Text("Edit points") })
+            }
+            Text(
+                if (mode == "ADD") "Tap the drafting plane to add vertices to the selected piece."
+                else "Tap a vertex to select it, then drag it to adjust its position.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (selectedPiece != null) {
+                OutlinedButton(
+                    onClick = {
+                        val updated = selectedPiece.copy(isClosed = !selectedPiece.isClosed, updatedAt = System.currentTimeMillis())
+                        scope.launch { dao.updatePiece(updated) }
+                    },
+                    enabled = draftPoints.size >= 3 || selectedPiece.isClosed,
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text(if (selectedPiece.isClosed) "Reopen path" else "Close shape") }
+                OutlinedButton(
+                    onClick = {
+                        val updated = draftPoints.toMutableList().also { it.removeAt(selectedPoint) }
+                        draftPoints = updated
+                        selectedPoint = -1
+                        savePoints(updated)
+                    },
+                    enabled = selectedPoint in draftPoints.indices,
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Remove selected point") }
+                OutlinedButton(
+                    onClick = {
+                        scope.launch { dao.deletePiece(selectedPiece.id) }
+                        selectedId = null
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Delete piece") }
+            }
+            HorizontalDivider()
+            Text("VIEW", style = MaterialTheme.typography.labelLarge)
+            Text("${(zoom / 2.5f * 100).roundToInt()}% zoom", style = MaterialTheme.typography.bodySmall)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                OutlinedButton(onClick = { zoom = (zoom / 1.25f).coerceAtLeast(0.25f) }) { Text("−") }
+                OutlinedButton(onClick = { zoom = (zoom * 1.25f).coerceAtMost(20f) }) { Text("+") }
+                OutlinedButton(onClick = { zoom = 2.5f; pan = Offset.Zero }) { Text("Reset") }
+            }
+            Text("Grid: 10 mm", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+
     }
 
     if (showNewPiece) {
