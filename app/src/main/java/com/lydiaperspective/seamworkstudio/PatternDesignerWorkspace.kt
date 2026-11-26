@@ -3,8 +3,10 @@ package com.lydiaperspective.seamworkstudio
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -16,6 +18,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.awaitPointerEvent
 import androidx.compose.ui.unit.dp
 import com.lydiaperspective.seamworkstudio.data.GarmentProject
 import com.lydiaperspective.seamworkstudio.data.PatternPiece
@@ -220,6 +223,9 @@ fun PatternDesignerWorkspace(
                                     )
                                     draftPoints = updated
                                     change.consume()
+                                } else {
+                                    pan += change.positionChange()
+                                    change.consume()
                                 }
                             },
                             onDragEnd = {
@@ -230,9 +236,20 @@ fun PatternDesignerWorkspace(
                         )
                     }
                     .pointerInput(Unit) {
-                        detectTransformGestures { _, panChange, zoomChange, _ ->
-                            pan += panChange
-                            zoom = (zoom * zoomChange).coerceIn(0.25f, 20f)
+                        awaitEachGesture {
+                            var event = awaitPointerEvent()
+                            while (event.changes.count { it.pressed } < 2) {
+                                if (event.changes.none { it.pressed }) return@awaitEachGesture
+                                event = awaitPointerEvent()
+                            }
+                            do {
+                                val zoomChange = event.calculateZoom()
+                                val panChange = event.calculatePan()
+                                zoom = (zoom * zoomChange).coerceIn(0.25f, 20f)
+                                pan += panChange
+                                event.changes.forEach { it.consume() }
+                                event = awaitPointerEvent()
+                            } while (event.changes.any { it.pressed })
                         }
                     }
             ) {
