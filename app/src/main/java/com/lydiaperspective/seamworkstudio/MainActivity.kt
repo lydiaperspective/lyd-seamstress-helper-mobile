@@ -139,7 +139,7 @@ private fun WorkspaceHome(project: GarmentProject, back: () -> Unit, open: (Stri
 }
 
 @Composable
-private fun InspirationWorkspace(
+private fun LegacyInspirationWorkspace(
     project: GarmentProject,
     database: SeamworkDatabase,
     back: () -> Unit
