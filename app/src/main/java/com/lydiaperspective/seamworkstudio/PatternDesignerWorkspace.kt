@@ -72,7 +72,7 @@ fun PatternDesignerWorkspace(
     var selectedId by remember(project.id) { mutableStateOf<Long?>(null) }
     val selectedPiece = pieces.firstOrNull { it.id == selectedId } ?: pieces.firstOrNull()
     var draftPoints by remember(selectedPiece?.id) {
-        mutableStateOf(selectedPiece?.let { decodePatternPoints(it.pointsData) } ?: emptyList())
+        mutableStateOf(selectedPiece?.let { decodeGeometry(it.pointsData, it.isClosed).points } ?: emptyList())
     }
     var mode by remember { mutableStateOf("ADD") }
     var selectedPoint by remember { mutableIntStateOf(-1) }
