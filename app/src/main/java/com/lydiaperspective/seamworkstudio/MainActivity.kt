@@ -65,6 +65,11 @@ private fun SeamworkApp(database: SeamworkDatabase) {
                     database = database,
                     back = { activeWorkspace = null }
                 )
+                activeWorkspace == "Sketchbook" -> SketchbookWorkspace(
+                    project = activeProject!!,
+                    database = database,
+                    back = { activeWorkspace = null }
+                )
                 else -> WorkspacePage(activeProject!!, activeWorkspace!!) { activeWorkspace = null }
             }
             if (showCreate) {
