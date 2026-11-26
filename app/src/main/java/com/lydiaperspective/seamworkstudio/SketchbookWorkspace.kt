@@ -1,6 +1,12 @@
 package com.lydiaperspective.seamworkstudio
 
+import android.content.Context
+import android.graphics.Canvas as AndroidCanvas
 import android.graphics.Color as AndroidColor
+import android.graphics.Paint
+import android.graphics.Path as NativePath
+import android.view.View
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -36,6 +42,47 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 private data class InkStroke(val color: Int, val width: Float, val points: List<Offset>)
+
+private class LiveInkView(context: Context) : View(context) {
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
+    private var points: List<Offset> = emptyList()
+    private var inkColor: Int = AndroidColor.BLACK
+    private var inkWidth: Float = 3f
+
+    fun showStroke(color: Int, widthDp: Float, newPoints: List<Offset>) {
+        inkColor = color
+        inkWidth = widthDp * resources.displayMetrics.density
+        points = newPoints
+        invalidate()
+    }
+
+    fun clearStroke() {
+        points = emptyList()
+        invalidate()
+    }
+
+    override fun onDraw(canvas: AndroidCanvas) {
+        super.onDraw(canvas)
+        if (points.isEmpty()) return
+        paint.color = inkColor
+        paint.strokeWidth = inkWidth
+        val path = NativePath().apply {
+            moveTo(points.first().x * width, points.first().y * height)
+            points.drop(1).forEach { lineTo(it.x * width, it.y * height) }
+        }
+        if (points.size == 1) {
+            paint.style = Paint.Style.FILL
+            canvas.drawCircle(points[0].x * width, points[0].y * height, inkWidth / 2f, paint)
+            paint.style = Paint.Style.STROKE
+        } else {
+            canvas.drawPath(path, paint)
+        }
+    }
+}
 
 private fun encodeStrokes(strokes: List<InkStroke>) = strokes.joinToString(";") { stroke ->
     "${stroke.color},${stroke.width}," + stroke.points.joinToString("|") { "${it.x},${it.y}" }
@@ -164,7 +211,7 @@ private fun SketchPageEditor(page: SketchPage, save: suspend (SketchPage) -> Uni
     var strokes by remember(page.id) { mutableStateOf(decodeStrokes(page.drawingData)) }
     var undoHistory by remember(page.id) { mutableStateOf(listOf<List<InkStroke>>()) }
     var redoHistory by remember(page.id) { mutableStateOf(listOf<List<InkStroke>>()) }
-    val currentPoints = remember(page.id) { mutableStateListOf<Offset>() }
+    val liveInkView = remember(page.id) { mutableStateOf<LiveInkView?>(null) }
     var tool by remember(page.id) { mutableStateOf("PEN") }
     var penOnly by remember(page.id) { mutableStateOf(true) }
     var sidebarVisible by remember(page.id) { mutableStateOf(false) }
@@ -215,8 +262,9 @@ private fun SketchPageEditor(page: SketchPage, save: suspend (SketchPage) -> Uni
                                         (pointer.position.y / size.height).coerceIn(0f, 1f)
                                     )
                                 )
-                                currentPoints.clear()
-                                currentPoints.addAll(points)
+                                val liveColor = if (tool == "ERASER") AndroidColor.WHITE else brushColor
+                                val liveWidth = if (tool == "ERASER") brushSize * 4f else brushSize
+                                liveInkView.value?.showStroke(liveColor, liveWidth, points)
                                 var active = true
                                 while (active) {
                                     val event = awaitPointerEvent()
@@ -233,7 +281,7 @@ private fun SketchPageEditor(page: SketchPage, save: suspend (SketchPage) -> Uni
                                         )
                                         if (points.lastOrNull() != next) {
                                             points.add(next)
-                                            currentPoints.add(next)
+                                            liveInkView.value?.showStroke(liveColor, liveWidth, points)
                                         }
                                         change.consume()
                                     }
@@ -245,7 +293,7 @@ private fun SketchPageEditor(page: SketchPage, save: suspend (SketchPage) -> Uni
                                     strokes = strokes + InkStroke(color, width, points.toList())
                                     redoHistory = emptyList()
                                 }
-                                currentPoints.clear()
+                                liveInkView.value?.clearStroke()
                             }
                         }
                         .pointerInput(penOnly) {
@@ -302,21 +350,12 @@ private fun SketchPageEditor(page: SketchPage, save: suspend (SketchPage) -> Uni
                                 drawPath(path, Color(stroke.color), style = Stroke(stroke.width.dp.toPx(), cap = StrokeCap.Round))
                             }
                         }
-                        if (currentPoints.isNotEmpty()) {
-                            val liveColor = if (tool == "ERASER") Color.White else Color(brushColor)
-                            val liveWidth = with(density) { (if (tool == "ERASER") brushSize * 4f else brushSize).dp.toPx() }
-                            if (currentPoints.size == 1) {
-                                drawCircle(liveColor, liveWidth / 2f,
-                                    Offset(currentPoints[0].x * size.width, currentPoints[0].y * size.height))
-                            } else {
-                                val livePath = Path().apply {
-                                    moveTo(currentPoints.first().x * size.width, currentPoints.first().y * size.height)
-                                    currentPoints.drop(1).forEach { lineTo(it.x * size.width, it.y * size.height) }
-                                }
-                                drawPath(livePath, liveColor, style = Stroke(liveWidth, cap = StrokeCap.Round))
-                            }
-                        }
                     }
+                    AndroidView(
+                        factory = { context -> LiveInkView(context).also { liveInkView.value = it } },
+                        modifier = Modifier.fillMaxSize(),
+                        update = { liveInkView.value = it }
+                    )
                 }
             }
             Text(
