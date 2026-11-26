@@ -107,7 +107,7 @@ private fun ProjectHome(
     create: () -> Unit,
     delete: (GarmentProject) -> Unit
 ) {
-    Column(Modifier.fillMaxSize().padding(28.dp)) {
+    Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars).padding(28.dp)) {
         Text("SEAMWORK STUDIO", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.height(8.dp))
         Text("Your projects", style = MaterialTheme.typography.headlineLarge)
@@ -134,7 +134,7 @@ private fun ProjectHome(
 
 @Composable
 private fun WorkspaceHome(project: GarmentProject, back: () -> Unit, open: (String) -> Unit) {
-    Column(Modifier.fillMaxSize().padding(28.dp)) {
+    Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars).padding(28.dp)) {
         TextButton(onClick = back) { Text("<  Projects") }
         Text(project.name, style = MaterialTheme.typography.headlineLarge)
         Text("Choose a workspace", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -275,7 +275,7 @@ private fun WorkspacePage(project: GarmentProject, workspace: String, back: () -
         "Fabric Layout" -> "Arrange pattern pieces and estimate fabric yardage."
         else -> "Prepare print layouts, tiled PDFs and projector calibration."
     }
-    Column(Modifier.fillMaxSize().padding(28.dp)) {
+    Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars).padding(28.dp)) {
         TextButton(onClick = back) { Text("<  " + project.name) }
         Text(workspace, style = MaterialTheme.typography.headlineLarge)
         Spacer(Modifier.height(12.dp))
