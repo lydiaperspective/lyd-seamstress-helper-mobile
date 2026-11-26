@@ -382,7 +382,15 @@ fun PatternDesignerWorkspace(
             if (selectedPiece != null) {
                 OutlinedButton(
                     onClick = {
-                        val updated = selectedPiece.copy(isClosed = !selectedPiece.isClosed, updatedAt = System.currentTimeMillis())
+                        val closing = !selectedPiece.isClosed
+                        val updatedEdges = if (closing && draftPoints.size >= 3) {
+                            draftEdges + normalizedEdge(0, draftPoints.lastIndex)
+                        } else if (!closing && draftPoints.size >= 3) {
+                            draftEdges - normalizedEdge(0, draftPoints.lastIndex)
+                        } else draftEdges
+                        draftEdges = updatedEdges
+                        saveGeometry(draftPoints, updatedEdges)
+                        val updated = selectedPiece.copy(isClosed = closing, updatedAt = System.currentTimeMillis())
                         scope.launch { dao.updatePiece(updated) }
                     },
                     enabled = draftPoints.size >= 3 || selectedPiece.isClosed,
