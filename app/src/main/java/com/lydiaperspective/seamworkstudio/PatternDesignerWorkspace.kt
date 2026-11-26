@@ -1,0 +1,315 @@
+package com.lydiaperspective.seamworkstudio
+
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.dp
+import com.lydiaperspective.seamworkstudio.data.GarmentProject
+import com.lydiaperspective.seamworkstudio.data.PatternPiece
+import com.lydiaperspective.seamworkstudio.data.SeamworkDatabase
+import kotlinx.coroutines.launch
+import kotlin.math.ceil
+import kotlin.math.hypot
+import kotlin.math.roundToInt
+
+private fun encodePatternPoints(points: List<Offset>): String =
+    points.joinToString(";") { "${it.x},${it.y}" }
+
+private fun decodePatternPoints(data: String): List<Offset> =
+    if (data.isBlank()) emptyList() else data.split(";").mapNotNull { item ->
+        val pair = item.split(",")
+        if (pair.size != 2) null else runCatching {
+            Offset(pair[0].toFloat(), pair[1].toFloat())
+        }.getOrNull()
+    }
+
+@Composable
+fun PatternDesignerWorkspace(
+    project: GarmentProject,
+    database: SeamworkDatabase,
+    back: () -> Unit
+) {
+    val dao = database.patternPieceDao()
+    val pieces by dao.observePieces(project.id).collectAsState(initial = emptyList())
+    val scope = rememberCoroutineScope()
+    var selectedId by remember(project.id) { mutableStateOf<Long?>(null) }
+    val selectedPiece = pieces.firstOrNull { it.id == selectedId } ?: pieces.firstOrNull()
+    var draftPoints by remember(selectedPiece?.id) {
+        mutableStateOf(selectedPiece?.let { decodePatternPoints(it.pointsData) } ?: emptyList())
+    }
+    var mode by remember { mutableStateOf("ADD") }
+    var selectedPoint by remember { mutableIntStateOf(-1) }
+    var zoom by remember { mutableFloatStateOf(2.5f) }
+    var pan by remember { mutableStateOf(Offset.Zero) }
+    var showNewPiece by remember { mutableStateOf(false) }
+    var newPieceName by remember { mutableStateOf("") }
+
+    LaunchedEffect(selectedPiece?.id, selectedPiece?.pointsData) {
+        draftPoints = selectedPiece?.let { decodePatternPoints(it.pointsData) } ?: emptyList()
+        selectedPoint = -1
+    }
+
+    fun savePoints(points: List<Offset>) {
+        val piece = selectedPiece ?: return
+        scope.launch {
+            dao.updatePiece(piece.copy(pointsData = encodePatternPoints(points), updatedAt = System.currentTimeMillis()))
+        }
+    }
+
+    Row(
+        Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
+            .windowInsetsPadding(WindowInsets.systemBars)
+    ) {
+        Column(
+            Modifier.width(230.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surface)
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(9.dp)
+        ) {
+            TextButton(onClick = back) { Text("‹  ${project.name}") }
+            Text("PATTERN PIECES", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            Button(onClick = { newPieceName = ""; showNewPiece = true }, modifier = Modifier.fillMaxWidth()) {
+                Text("+ New piece")
+            }
+            LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                items(pieces, key = { it.id }) { piece ->
+                    val active = piece.id == (selectedPiece?.id)
+                    OutlinedButton(
+                        onClick = { selectedId = piece.id },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = if (active) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
+                        ),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp)
+                    ) {
+                        Column(Modifier.fillMaxWidth()) {
+                            Text(piece.name, maxLines = 1)
+                            Text(
+                                "${decodePatternPoints(piece.pointsData).size} points" + if (piece.isClosed) " · Closed" else " · Open",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+            HorizontalDivider()
+            Text("EDITING", style = MaterialTheme.typography.labelLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FilterChip(selected = mode == "ADD", onClick = { mode = "ADD"; selectedPoint = -1 }, label = { Text("Add points") })
+                FilterChip(selected = mode == "EDIT", onClick = { mode = "EDIT" }, label = { Text("Edit points") })
+            }
+            Text(
+                if (mode == "ADD") "Tap the drafting plane to add vertices to the selected piece."
+                else "Tap a vertex to select it, then drag it to adjust its position.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (selectedPiece != null) {
+                OutlinedButton(
+                    onClick = {
+                        val updated = selectedPiece.copy(isClosed = !selectedPiece.isClosed, updatedAt = System.currentTimeMillis())
+                        scope.launch { dao.updatePiece(updated) }
+                    },
+                    enabled = draftPoints.size >= 3 || selectedPiece.isClosed,
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text(if (selectedPiece.isClosed) "Reopen path" else "Close shape") }
+                OutlinedButton(
+                    onClick = {
+                        scope.launch { dao.deletePiece(selectedPiece.id) }
+                        selectedId = null
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Delete piece") }
+            }
+            HorizontalDivider()
+            Text("VIEW", style = MaterialTheme.typography.labelLarge)
+            Text("${(zoom / 2.5f * 100).roundToInt()}% zoom", style = MaterialTheme.typography.bodySmall)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                OutlinedButton(onClick = { zoom = (zoom / 1.25f).coerceAtLeast(0.25f) }) { Text("−") }
+                OutlinedButton(onClick = { zoom = (zoom * 1.25f).coerceAtMost(20f) }) { Text("+") }
+                OutlinedButton(onClick = { zoom = 2.5f; pan = Offset.Zero }) { Text("Reset") }
+            }
+            Text("Grid: 10 mm", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+
+        Box(Modifier.weight(1f).fillMaxHeight().background(Color(0xFFF1EEE9))) {
+            Canvas(
+                Modifier.fillMaxSize()
+                    .pointerInput(mode, selectedPiece?.id, draftPoints, zoom, pan) {
+                        detectTapGestures { tap ->
+                            val world = Offset(
+                                (tap.x - size.width / 2f - pan.x) / zoom,
+                                (tap.y - size.height / 2f - pan.y) / zoom
+                            )
+                            if (mode == "ADD") {
+                                if (selectedPiece != null && !selectedPiece.isClosed) {
+                                    val next = draftPoints + world
+                                    draftPoints = next
+                                    savePoints(next)
+                                }
+                            } else {
+                                val nearest = draftPoints.indices.minByOrNull { index ->
+                                    val point = draftPoints[index]
+                                    hypot(
+                                        (size.width / 2f + pan.x + point.x * zoom) - tap.x,
+                                        (size.height / 2f + pan.y + point.y * zoom) - tap.y
+                                    )
+                                }
+                                selectedPoint = nearest?.takeIf { index ->
+                                    val point = draftPoints[index]
+                                    hypot(
+                                        (size.width / 2f + pan.x + point.x * zoom) - tap.x,
+                                        (size.height / 2f + pan.y + point.y * zoom) - tap.y
+                                    ) < 28f
+                                } ?: -1
+                            }
+                        }
+                    }
+                    .pointerInput(mode, selectedPiece?.id, draftPoints, zoom, pan) {
+                        var movingIndex = -1
+                        detectDragGestures(
+                            onDragStart = { start ->
+                                if (mode == "EDIT") {
+                                    movingIndex = draftPoints.indices.minByOrNull { index ->
+                                        val point = draftPoints[index]
+                                        hypot(
+                                            (size.width / 2f + pan.x + point.x * zoom) - start.x,
+                                            (size.height / 2f + pan.y + point.y * zoom) - start.y
+                                        )
+                                    } ?: -1
+                                    if (movingIndex >= 0) {
+                                        val point = draftPoints[movingIndex]
+                                        val distance = hypot(
+                                            (size.width / 2f + pan.x + point.x * zoom) - start.x,
+                                            (size.height / 2f + pan.y + point.y * zoom) - start.y
+                                        )
+                                        if (distance > 30f) movingIndex = -1
+                                    }
+                                }
+                            },
+                            onDrag = { change, _ ->
+                                if (movingIndex >= 0 && mode == "EDIT") {
+                                    val updated = draftPoints.toMutableList()
+                                    updated[movingIndex] = Offset(
+                                        (change.position.x - size.width / 2f - pan.x) / zoom,
+                                        (change.position.y - size.height / 2f - pan.y) / zoom
+                                    )
+                                    draftPoints = updated
+                                    change.consume()
+                                }
+                            },
+                            onDragEnd = {
+                                if (movingIndex >= 0) savePoints(draftPoints)
+                                movingIndex = -1
+                            },
+                            onDragCancel = { movingIndex = -1 }
+                        )
+                    }
+                    .pointerInput(Unit) {
+                        detectTransformGestures { _, panChange, zoomChange, _ ->
+                            pan += panChange
+                            zoom = (zoom * zoomChange).coerceIn(0.25f, 20f)
+                        }
+                    }
+            ) {
+                drawRect(Color(0xFFFDFCF9))
+                val gridStep = 10f * zoom
+                val originX = size.width / 2f + pan.x
+                val originY = size.height / 2f + pan.y
+                if (gridStep >= 3f) {
+                    val firstX = ceil((-originX) / gridStep).toInt()
+                    val lastX = ceil((size.width - originX) / gridStep).toInt()
+                    for (i in firstX..lastX) {
+                        val x = originX + i * gridStep
+                        drawLine(Color(0xFFE9E3DC), Offset(x, 0f), Offset(x, size.height), 1f)
+                    }
+                    val firstY = ceil((-originY) / gridStep).toInt()
+                    val lastY = ceil((size.height - originY) / gridStep).toInt()
+                    for (i in firstY..lastY) {
+                        val y = originY + i * gridStep
+                        drawLine(Color(0xFFE9E3DC), Offset(0f, y), Offset(size.width, y), 1f)
+                    }
+                }
+                drawLine(Color(0xFFB9A99B), Offset(originX, 0f), Offset(originX, size.height), 1.5f)
+                drawLine(Color(0xFFB9A99B), Offset(0f, originY), Offset(size.width, originY), 1.5f)
+
+                pieces.forEach { piece ->
+                    val points = if (piece.id == selectedPiece?.id) draftPoints else decodePatternPoints(piece.pointsData)
+                    if (points.isNotEmpty()) {
+                        val path = Path().apply {
+                            moveTo(originX + points.first().x * zoom, originY + points.first().y * zoom)
+                            points.drop(1).forEach { lineTo(originX + it.x * zoom, originY + it.y * zoom) }
+                            if (piece.isClosed && points.size >= 3) close()
+                        }
+                        drawPath(
+                            path,
+                            if (piece.id == selectedPiece?.id) Color(0xFF765B49) else Color(0xFF9A9A9A),
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.2f)
+                        )
+                        if (piece.id == selectedPiece?.id) {
+                            points.forEachIndexed { index, point ->
+                                val p = Offset(originX + point.x * zoom, originY + point.y * zoom)
+                                drawCircle(
+                                    if (index == selectedPoint) Color(0xFFD28B36) else Color(0xFF765B49),
+                                    radius = if (index == selectedPoint) 7f else 5f,
+                                    center = p
+                                )
+                                drawCircle(Color.White, radius = 1.8f, center = p)
+                            }
+                        }
+                    }
+                }
+            }
+            Column(Modifier.align(Alignment.TopStart).padding(12.dp)) {
+                Text(selectedPiece?.name ?: "No pattern piece selected", style = MaterialTheme.typography.titleMedium)
+                Text("Infinite drafting plane · coordinates in mm", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Text(
+                "Pan and pinch to navigate · 10 mm grid",
+                Modifier.align(Alignment.BottomStart).padding(12.dp),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+
+    if (showNewPiece) {
+        AlertDialog(
+            onDismissRequest = { showNewPiece = false },
+            title = { Text("New pattern piece") },
+            text = {
+                OutlinedTextField(
+                    value = newPieceName,
+                    onValueChange = { newPieceName = it },
+                    label = { Text("Piece name") },
+                    placeholder = { Text("e.g. Front bodice") },
+                    singleLine = true
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val name = newPieceName.trim().ifBlank { "Pattern piece ${pieces.size + 1}" }
+                    scope.launch {
+                        val id = dao.insertPiece(PatternPiece(projectId = project.id, name = name))
+                        selectedId = id
+                    }
+                    showNewPiece = false
+                }) { Text("Create") }
+            },
+            dismissButton = { TextButton(onClick = { showNewPiece = false }) { Text("Cancel") } }
+        )
+    }
+}
