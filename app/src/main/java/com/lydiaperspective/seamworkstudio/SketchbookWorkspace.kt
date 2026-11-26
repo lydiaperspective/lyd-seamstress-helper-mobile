@@ -142,7 +142,7 @@ private fun SketchPageEditor(page: SketchPage, save: suspend (SketchPage) -> Uni
     var strokes by remember(page.id) { mutableStateOf(decodeStrokes(page.drawingData)) }
     var undoHistory by remember(page.id) { mutableStateOf(listOf<List<InkStroke>>()) }
     var redoHistory by remember(page.id) { mutableStateOf(listOf<List<InkStroke>>()) }
-    var currentPoints by remember(page.id) { mutableStateOf<List<Offset>>(emptyList()) }
+    val currentPoints = remember(page.id) { mutableStateListOf<Offset>() }
     var tool by remember(page.id) { mutableStateOf("PEN") }
     var penOnly by remember(page.id) { mutableStateOf(true) }
     var sidebarVisible by remember(page.id) { mutableStateOf(false) }
@@ -168,11 +168,11 @@ private fun SketchPageEditor(page: SketchPage, save: suspend (SketchPage) -> Uni
                 contentAlignment = Alignment.Center
             ) {
                 val ratio = when (paperSize) { "A4" -> 0.707f; "Letter" -> 0.773f; else -> 1.35f }
-                val canvasWidth = minOf(maxWidth, maxHeight * ratio)
-                val canvasHeight = canvasWidth / ratio
+                val canvasWidth = if (paperSize == "Open") maxWidth else minOf(maxWidth, maxHeight * ratio)
+                val canvasHeight = if (paperSize == "Open") maxHeight else canvasWidth / ratio
                 Box(
                     Modifier.width(canvasWidth).height(canvasHeight)
-                        .clip(RoundedCornerShape(4.dp)).background(Color.White)
+                        .then(if (paperSize == "Open") Modifier.background(Color.White) else Modifier.clip(RoundedCornerShape(4.dp)).background(Color.White))
                         .graphicsLayer {
                             scaleX = zoom; scaleY = zoom
                             translationX = pan.x; translationY = pan.y
@@ -188,8 +188,13 @@ private fun SketchPageEditor(page: SketchPage, save: suspend (SketchPage) -> Uni
                                     return@awaitEachGesture
                                 }
                                 val points = mutableListOf(
-                                    Offset(pointer.position.x / size.width, pointer.position.y / size.height)
+                                    Offset(
+                                        (pointer.position.x / size.width).coerceIn(0f, 1f),
+                                        (pointer.position.y / size.height).coerceIn(0f, 1f)
+                                    )
                                 )
+                                currentPoints.clear()
+                                currentPoints.addAll(points)
                                 var active = true
                                 while (active) {
                                     val event = awaitPointerEvent()
@@ -200,10 +205,14 @@ private fun SketchPageEditor(page: SketchPage, save: suspend (SketchPage) -> Uni
                                     } else if (change == null || !change.pressed) {
                                         active = false
                                     } else {
-                                        points.add(Offset(
+                                        val next = Offset(
                                             (change.position.x / size.width).coerceIn(0f, 1f),
                                             (change.position.y / size.height).coerceIn(0f, 1f)
-                                        ))
+                                        )
+                                        if (points.lastOrNull() != next) {
+                                            points.add(next)
+                                            currentPoints.add(next)
+                                        }
                                         change.consume()
                                     }
                                 }
@@ -211,9 +220,10 @@ private fun SketchPageEditor(page: SketchPage, save: suspend (SketchPage) -> Uni
                                     undoHistory = undoHistory + listOf(strokes)
                                     val color = if (tool == "ERASER") AndroidColor.WHITE else brushColor
                                     val width = if (tool == "ERASER") brushSize * 4f else brushSize
-                                    strokes = strokes + InkStroke(color, width, points)
+                                    strokes = strokes + InkStroke(color, width, points.toList())
                                     redoHistory = emptyList()
                                 }
+                                currentPoints.clear()
                             }
                         }
                         .pointerInput(penOnly) {
@@ -268,6 +278,20 @@ private fun SketchPageEditor(page: SketchPage, save: suspend (SketchPage) -> Uni
                                     stroke.points.drop(1).forEach { lineTo(it.x * size.width, it.y * size.height) }
                                 }
                                 drawPath(path, Color(stroke.color), style = Stroke(stroke.width.dp.toPx(), cap = StrokeCap.Round))
+                            }
+                        }
+                        if (currentPoints.isNotEmpty()) {
+                            val liveColor = if (tool == "ERASER") Color.White else Color(brushColor)
+                            val liveWidth = with(density) { (if (tool == "ERASER") brushSize * 4f else brushSize).dp.toPx() }
+                            if (currentPoints.size == 1) {
+                                drawCircle(liveColor, liveWidth / 2f,
+                                    Offset(currentPoints[0].x * size.width, currentPoints[0].y * size.height))
+                            } else {
+                                val livePath = Path().apply {
+                                    moveTo(currentPoints.first().x * size.width, currentPoints.first().y * size.height)
+                                    currentPoints.drop(1).forEach { lineTo(it.x * size.width, it.y * size.height) }
+                                }
+                                drawPath(livePath, liveColor, style = Stroke(liveWidth, cap = StrokeCap.Round))
                             }
                         }
                     }
