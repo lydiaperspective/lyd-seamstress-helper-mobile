@@ -119,6 +119,8 @@ fun PatternDesignerWorkspace(
         Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
             .windowInsetsPadding(WindowInsets.systemBars)
     ) {
+        val viewportWidth = maxWidth
+        val viewportHeight = maxHeight
         Box(Modifier.fillMaxSize().background(Color(0xFFF1EEE9))) {
             Canvas(
                 Modifier.fillMaxSize()
@@ -304,8 +306,8 @@ fun PatternDesignerWorkspace(
             if (pointMenuIndex in draftPoints.indices) {
                 val point = draftPoints[pointMenuIndex]
                 val density = LocalDensity.current
-                val menuX = (maxWidth / 2 + with(density) { (pan.x + point.x * zoom).toDp() } + 14.dp).coerceIn(8.dp, maxWidth - 176.dp)
-                val menuY = (maxHeight / 2 + with(density) { (pan.y + point.y * zoom).toDp() } + 14.dp).coerceIn(72.dp, maxHeight - 220.dp)
+                val menuX = (viewportWidth / 2 + with(density) { (pan.x + point.x * zoom).toDp() } + 14.dp).coerceIn(8.dp, (viewportWidth - 176.dp).coerceAtLeast(8.dp))
+                val menuY = (viewportHeight / 2 + with(density) { (pan.y + point.y * zoom).toDp() } + 14.dp).coerceIn(72.dp, (viewportHeight - 220.dp).coerceAtLeast(72.dp))
                 Surface(Modifier.offset(x = menuX, y = menuY).width(168.dp), shape = MaterialTheme.shapes.medium, tonalElevation = 6.dp, shadowElevation = 8.dp) {
                     Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text("Point ${pointMenuIndex + 1}", style = MaterialTheme.typography.labelMedium)
@@ -403,7 +405,7 @@ fun PatternDesignerWorkspace(
         }
         if (showTools) Column(
             Modifier.align(Alignment.CenterEnd)
-                .width(if (maxWidth < 600.dp) maxWidth * 0.82f else 260.dp)
+                .width(if (viewportWidth < 600.dp) viewportWidth * 0.82f else 260.dp)
                 .fillMaxHeight()
                 .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.97f))
                 .padding(12.dp),
