@@ -345,7 +345,7 @@ private fun SketchPageEditor(page: SketchPage, save: suspend (SketchPage) -> Uni
         } else {
             FilledTonalIconButton(
                 onClick = { sidebarVisible = true },
-                modifier = Modifier.align(Alignment.CenterEnd).padding(6.dp)
+                modifier = Modifier.align(Alignment.CenterVertically).padding(6.dp)
             ) { Text("›") }
         }
     }
