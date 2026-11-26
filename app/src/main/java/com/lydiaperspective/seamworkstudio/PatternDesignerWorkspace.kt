@@ -217,6 +217,9 @@ fun PatternDesignerWorkspace(
                 }
             }
             Column(Modifier.align(Alignment.TopStart).padding(12.dp)) {
+                TextButton(onClick = back, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)) {
+                    Text("‹  ${project.name}")
+                }
                 Text(selectedPiece?.name ?: "No pattern piece selected", style = MaterialTheme.typography.titleMedium)
                 Text("Infinite drafting plane · coordinates in mm", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -240,7 +243,7 @@ fun PatternDesignerWorkspace(
             verticalArrangement = Arrangement.spacedBy(9.dp)
         ) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = back) { Text("‹  ${project.name}") }
+                Text("TOOLS", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                 TextButton(onClick = { showTools = false }) { Text("Hide") }
             }
             Text("PATTERN PIECES", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
