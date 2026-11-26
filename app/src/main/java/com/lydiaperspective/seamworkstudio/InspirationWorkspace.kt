@@ -71,7 +71,12 @@ fun InspirationWorkspace(
         }
     }
 
-    Column(Modifier.fillMaxSize().padding(horizontal = 22.dp, vertical = 16.dp)) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.systemBars)
+            .padding(horizontal = 22.dp, vertical = 16.dp)
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             TextButton(onClick = back) { Text("<  ${project.name}") }
             Spacer(Modifier.weight(1f))
