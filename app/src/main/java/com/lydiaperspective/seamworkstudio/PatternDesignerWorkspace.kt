@@ -244,7 +244,7 @@ fun PatternDesignerWorkspace(
                 drawLine(Color(0xFFB9A99B), Offset(0f, originY), Offset(size.width, originY), 1.5f)
 
                 pieces.forEach { piece ->
-                    val points = if (piece.id == selectedPiece?.id) draftPoints else decodePatternPoints(piece.pointsData)
+                    val points = if (piece.id == selectedPiece?.id) draftPoints else decodeGeometry(piece.pointsData, piece.isClosed).points
                     if (points.isNotEmpty()) {
                         val edges = if (piece.id == selectedPiece?.id) draftEdges else decodeGeometry(piece.pointsData, piece.isClosed).edges
                         val lineColor = if (piece.id == selectedPiece?.id) Color(0xFF765B49) else Color(0xFF9A9A9A)
