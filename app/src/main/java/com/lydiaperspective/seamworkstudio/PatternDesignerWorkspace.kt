@@ -57,7 +57,7 @@ fun PatternDesignerWorkspace(
     var zoom by remember { mutableFloatStateOf(2.5f) }
     var pan by remember { mutableStateOf(Offset.Zero) }
     var showNewPiece by remember { mutableStateOf(false) }
-    var showTools by remember { mutableStateOf(true) }
+    var showTools by remember { mutableStateOf(false) }
     var newPieceName by remember { mutableStateOf("") }
     val currentDraftPoints by rememberUpdatedState(draftPoints)
 
