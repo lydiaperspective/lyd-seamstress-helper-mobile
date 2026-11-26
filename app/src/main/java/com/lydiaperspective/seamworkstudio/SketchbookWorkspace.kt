@@ -194,7 +194,10 @@ private fun SketchPageEditor(page: SketchPage, save: suspend (SketchPage) -> Uni
                                 while (active) {
                                     val event = awaitPointerEvent()
                                     val change = event.changes.firstOrNull { it.id == pointer.id }
-                                    if (change == null || !change.pressed) {
+                                    if (event.changes.count { it.pressed } >= 2) {
+                                        active = false
+                                        points.clear()
+                                    } else if (change == null || !change.pressed) {
                                         active = false
                                     } else {
                                         points.add(Offset(
@@ -270,15 +273,12 @@ private fun SketchPageEditor(page: SketchPage, save: suspend (SketchPage) -> Uni
                     }
                 }
             }
-            Row(
-                Modifier.align(Alignment.TopStart).padding(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(onClick = { sidebarVisible = !sidebarVisible }) {
-                    Text(if (sidebarVisible) "Hide tools" else "Show tools")
-                }
-                Text(page.title, style = MaterialTheme.typography.titleMedium, color = Color(0xFF51473F))
-            }
+            Text(
+                page.title,
+                Modifier.align(Alignment.TopStart).padding(12.dp),
+                style = MaterialTheme.typography.titleMedium,
+                color = Color(0xFF51473F)
+            )
             Text(
                 "${(zoom * 100).toInt()}%",
                 Modifier.align(Alignment.BottomEnd).padding(12.dp),
@@ -294,7 +294,10 @@ private fun SketchPageEditor(page: SketchPage, save: suspend (SketchPage) -> Uni
                     .padding(12.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text("TOOLS", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("TOOLS", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                    TextButton(onClick = { sidebarVisible = false }) { Text("Hide") }
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     FilterChip(selected = tool == "PEN", onClick = { tool = "PEN" }, label = { Text("Pen") })
                     FilterChip(selected = tool == "ERASER", onClick = { tool = "ERASER" }, label = { Text("Erase") })
