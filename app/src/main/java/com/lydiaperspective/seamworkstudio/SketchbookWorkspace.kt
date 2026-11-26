@@ -88,24 +88,46 @@ fun SketchbookWorkspace(project: GarmentProject, database: SeamworkDatabase, bac
                 }
             }
             if (selectedPage != null) {
-                Column(
-                    Modifier.align(Alignment.CenterStart).width(58.dp).padding(5.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    FilledTonalIconButton(onClick = back) { Text("‹") }
-                    Text("PAGES", style = MaterialTheme.typography.labelSmall)
-                    pages.forEachIndexed { index, page ->
-                        FilledTonalButton(
-                            onClick = { selectedPageId = page.id },
-                            contentPadding = PaddingValues(4.dp),
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.filledTonalButtonColors(
-                                containerColor = if (page.id == selectedPage.id) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
-                            )
-                        ) { Text("${index + 1}", maxLines = 1) }
+                if (maxWidth < 600.dp) {
+                    Row(
+                        Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.96f))
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        FilledTonalIconButton(onClick = back) { Text("‹") }
+                        pages.forEachIndexed { index, page ->
+                            FilledTonalButton(
+                                onClick = { selectedPageId = page.id },
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                                colors = ButtonDefaults.filledTonalButtonColors(
+                                    containerColor = if (page.id == selectedPage.id) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+                                )
+                            ) { Text("${index + 1}") }
+                        }
+                        FilledTonalIconButton(onClick = { newPageTitle = ""; showNewPageDialog = true }) { Text("+") }
                     }
-                    FilledTonalIconButton(onClick = { newPageTitle = ""; showNewPageDialog = true }) { Text("+") }
+                } else {
+                    Column(
+                        Modifier.align(Alignment.CenterStart).width(58.dp).padding(5.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilledTonalIconButton(onClick = back) { Text("‹") }
+                        Text("PAGES", style = MaterialTheme.typography.labelSmall)
+                        pages.forEachIndexed { index, page ->
+                            FilledTonalButton(
+                                onClick = { selectedPageId = page.id },
+                                contentPadding = PaddingValues(4.dp),
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.filledTonalButtonColors(
+                                    containerColor = if (page.id == selectedPage.id) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+                                )
+                            ) { Text("${index + 1}", maxLines = 1) }
+                        }
+                        FilledTonalIconButton(onClick = { newPageTitle = ""; showNewPageDialog = true }) { Text("+") }
+                    }
                 }
             }
         }
