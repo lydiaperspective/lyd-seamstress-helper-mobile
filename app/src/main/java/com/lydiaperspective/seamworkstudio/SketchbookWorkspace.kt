@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -122,41 +123,10 @@ fun SketchbookWorkspace(project: GarmentProject, database: SeamworkDatabase, bac
         Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
             .windowInsetsPadding(WindowInsets.systemBars)
     ) {
+        val compactLayout = maxWidth < 600.dp
         Box(Modifier.fillMaxSize()) {
             if (selectedPage != null) {
-                SketchPageEditor(
-                    page = selectedPage,
-                    save = { dao.updatePage(it) },
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-            }
-            if (selectedPage != null) {
-                if (maxWidth < 600.dp) {
-                    Row(
-                        Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.96f))
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        FilledTonalIconButton(onClick = back) { Text("‹") }
-                        pages.forEachIndexed { index, page ->
-                            FilledTonalButton(
-                                onClick = { selectedPageId = page.id },
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                                colors = ButtonDefaults.filledTonalButtonColors(
-                                    containerColor = if (page.id == selectedPage.id) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
-                                )
-                            ) { Text("${index + 1}") }
-                        }
-                        FilledTonalIconButton(onClick = { newPageTitle = ""; showNewPageDialog = true }) { Text("+") }
-                    }
-                } else {
-                    if (maxWidth < 600.dp) {
+                if (compactLayout) {
                     Row(
                         Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                             .padding(horizontal = 8.dp, vertical = 10.dp)
@@ -179,7 +149,7 @@ fun SketchbookWorkspace(project: GarmentProject, database: SeamworkDatabase, bac
                         FilledTonalIconButton(onClick = { newPageTitle = ""; showNewPageDialog = true }) { Text("+") }
                     }
                 } else {
-                Column(
+                    Column(
                         Modifier.align(Alignment.CenterStart).width(58.dp).padding(5.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -198,7 +168,6 @@ fun SketchbookWorkspace(project: GarmentProject, database: SeamworkDatabase, bac
                         }
                         FilledTonalIconButton(onClick = { newPageTitle = ""; showNewPageDialog = true }) { Text("+") }
                     }
-                }
                 }
             }
         }
