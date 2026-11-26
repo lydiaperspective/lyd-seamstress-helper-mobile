@@ -32,7 +32,6 @@ import androidx.compose.ui.window.DialogProperties
 import com.lydiaperspective.seamworkstudio.data.GarmentProject
 import com.lydiaperspective.seamworkstudio.data.SeamworkDatabase
 import com.lydiaperspective.seamworkstudio.data.SketchPage
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -176,7 +175,6 @@ private fun SketchPageEditor(
     val density = LocalDensity.current
 
     LaunchedEffect(page.id, strokes, paperSize, backgroundStyle) {
-        delay(300)
         save(page.copy(
             paperSize = paperSize,
             background = backgroundStyle,
