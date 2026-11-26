@@ -34,6 +34,7 @@ import com.lydiaperspective.seamworkstudio.data.SeamworkDatabase
 import com.lydiaperspective.seamworkstudio.data.SketchPage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 private data class InkStroke(
@@ -73,6 +74,7 @@ fun SketchbookWorkspace(
     val selectedPage = pages.firstOrNull { it.id == selectedPageId } ?: pages.firstOrNull()
     var showNewPageDialog by remember { mutableStateOf(false) }
     var newPageTitle by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(project.id) {
         if (dao.observePages(project.id).first().isEmpty()) {
@@ -142,7 +144,10 @@ fun SketchbookWorkspace(
             confirmButton = {
                 TextButton(onClick = {
                     val title = newPageTitle.trim().ifBlank { "Sketch page ${pages.size + 1}" }
-                    kotlinx.coroutines.GlobalScope // placeholder
+                    scope.launch {
+                        val id = dao.insertPage(SketchPage(projectId = project.id, title = title))
+                        selectedPageId = id
+                    }
                     showNewPageDialog = false
                 }) { Text("Create") }
             },
