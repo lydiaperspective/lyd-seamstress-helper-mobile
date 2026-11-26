@@ -27,16 +27,37 @@ import kotlin.math.ceil
 import kotlin.math.hypot
 import kotlin.math.roundToInt
 
-private fun encodePatternPoints(points: List<Offset>): String =
-    points.joinToString(";") { "${it.x},${it.y}" }
+private data class PatternGeometry(val points: List<Offset>, val edges: Set<Pair<Int, Int>>)
 
-private fun decodePatternPoints(data: String): List<Offset> =
-    if (data.isBlank()) emptyList() else data.split(";").mapNotNull { item ->
-        val pair = item.split(",")
-        if (pair.size != 2) null else runCatching {
-            Offset(pair[0].toFloat(), pair[1].toFloat())
-        }.getOrNull()
+private fun normalizedEdge(a: Int, b: Int): Pair<Int, Int> = if (a < b) a to b else b to a
+
+private fun defaultEdges(count: Int, closed: Boolean): Set<Pair<Int, Int>> = buildSet {
+    for (i in 0 until count - 1) add(i to (i + 1))
+    if (closed && count > 2) add(0 to (count - 1))
+}
+
+private fun encodeGeometry(points: List<Offset>, edges: Set<Pair<Int, Int>>): String {
+    val p = points.joinToString(";") { "${it.x},${it.y}" }
+    val e = edges.sortedWith(compareBy<Pair<Int, Int>> { it.first }.thenBy { it.second }).joinToString(";") { "${it.first},${it.second}" }
+    return "G2|$p|$e"
+}
+
+private fun decodeGeometry(data: String, closed: Boolean): PatternGeometry {
+    if (data.startsWith("G2|")) {
+        val sections = data.split("|", limit = 3)
+        val points = sections.getOrNull(1).orEmpty().split(";").filter { it.isNotBlank() }.mapNotNull { item ->
+            val pair = item.split(","); if (pair.size != 2) null else runCatching { Offset(pair[0].toFloat(), pair[1].toFloat()) }.getOrNull()
+        }
+        val edges = sections.getOrNull(2).orEmpty().split(";").filter { it.isNotBlank() }.mapNotNull { item ->
+            val pair = item.split(","); if (pair.size != 2) null else runCatching { normalizedEdge(pair[0].toInt(), pair[1].toInt()) }.getOrNull()
+        }.filter { it.first in points.indices && it.second in points.indices && it.first != it.second }.toSet()
+        return PatternGeometry(points, edges)
     }
+    val points = if (data.isBlank()) emptyList() else data.split(";").mapNotNull { item ->
+        val pair = item.split(","); if (pair.size != 2) null else runCatching { Offset(pair[0].toFloat(), pair[1].toFloat()) }.getOrNull()
+    }
+    return PatternGeometry(points, defaultEdges(points.size, closed))
+}
 
 @Composable
 fun PatternDesignerWorkspace(
@@ -54,6 +75,9 @@ fun PatternDesignerWorkspace(
     }
     var mode by remember { mutableStateOf("ADD") }
     var selectedPoint by remember { mutableIntStateOf(-1) }
+    var draftEdges by remember(selectedPiece?.id) { mutableStateOf(selectedPiece?.let { decodeGeometry(it.pointsData, it.isClosed).edges } ?: emptySet()) }
+    var pointMenuIndex by remember { mutableIntStateOf(-1) }
+    var pendingConnectionAction by remember { mutableStateOf<String?>(null) }
     var zoom by remember { mutableFloatStateOf(2.5f) }
     var pan by remember { mutableStateOf(Offset.Zero) }
     var showNewPiece by remember { mutableStateOf(false) }
@@ -62,14 +86,18 @@ fun PatternDesignerWorkspace(
     val currentDraftPoints by rememberUpdatedState(draftPoints)
 
     LaunchedEffect(selectedPiece?.id, selectedPiece?.pointsData) {
-        draftPoints = selectedPiece?.let { decodePatternPoints(it.pointsData) } ?: emptyList()
+        val geometry = selectedPiece?.let { decodeGeometry(it.pointsData, it.isClosed) }
+        draftPoints = geometry?.points ?: emptyList()
+        draftEdges = geometry?.edges ?: emptySet()
         selectedPoint = -1
+        pointMenuIndex = -1
+        pendingConnectionAction = null
     }
 
-    fun savePoints(points: List<Offset>) {
+    fun saveGeometry(points: List<Offset>, edges: Set<Pair<Int, Int>>) {
         val piece = selectedPiece ?: return
         scope.launch {
-            dao.updatePiece(piece.copy(pointsData = encodePatternPoints(points), updatedAt = System.currentTimeMillis()))
+            dao.updatePiece(piece.copy(pointsData = encodeGeometry(points, edges), updatedAt = System.currentTimeMillis()))
         }
     }
 
