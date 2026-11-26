@@ -350,7 +350,7 @@ private fun SketchPageEditor(page: SketchPage, save: suspend (SketchPage) -> Uni
                         }
                         // Keep ink on its own compositing layer so erasing clears ink only,
                         // never the paper, grid, or dot background drawn above.
-                        val inkLayer = drawContext.canvas.saveLayer(
+                        drawContext.canvas.saveLayer(
                             Rect(0f, 0f, size.width, size.height), ComposePaint()
                         )
                         strokes.forEach { stroke ->
@@ -376,7 +376,7 @@ private fun SketchPageEditor(page: SketchPage, save: suspend (SketchPage) -> Uni
                                 )
                             }
                         }
-                        drawContext.canvas.restoreToCount(inkLayer)
+                        drawContext.canvas.restore()
                     }
                     AndroidView(
                         factory = { context -> LiveInkView(context).also { liveInkView.value = it } },
