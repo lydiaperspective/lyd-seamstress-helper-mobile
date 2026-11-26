@@ -90,6 +90,8 @@ fun PatternDesignerWorkspace(
     var angleEditorIndex by remember { mutableIntStateOf(-1) }
     var pointMenuIndex by remember { mutableIntStateOf(-1) }
     var pendingConnectionAction by remember { mutableStateOf<String?>(null) }
+    var pendingDeleteAction by remember { mutableStateOf<String?>(null) }
+    var pendingDeletePointIndex by remember { mutableIntStateOf(-1) }
     var zoom by remember { mutableFloatStateOf(2.5f) }
     var pan by remember { mutableStateOf(Offset.Zero) }
     var showNewPiece by remember { mutableStateOf(false) }
@@ -113,6 +115,33 @@ fun PatternDesignerWorkspace(
         scope.launch {
             dao.updatePiece(piece.copy(pointsData = encodeGeometry(points, edges, angles), updatedAt = System.currentTimeMillis()))
         }
+    }
+
+    fun removePoint(index: Int) {
+        if (index !in draftPoints.indices) return
+        val updatedPoints = draftPoints.toMutableList().also { it.removeAt(index) }
+        val wasLinkedBefore = index > 0 && draftEdges.contains(normalizedEdge(index - 1, index))
+        val wasLinkedAfter = index < draftPoints.lastIndex && draftEdges.contains(normalizedEdge(index, index + 1))
+        val updatedEdges = draftEdges.mapNotNull { (a, b) ->
+            if (a == index || b == index) null else normalizedEdge(if (a > index) a - 1 else a, if (b > index) b - 1 else b)
+        }.toMutableSet().apply {
+            if (wasLinkedBefore && wasLinkedAfter && index > 0 && index < draftPoints.lastIndex) {
+                add(normalizedEdge(index - 1, index))
+            }
+        }
+        val updatedAngles = draftAngles.mapNotNull { (edge, value) ->
+            if (edge.first == index || edge.second == index) null else {
+                val a = if (edge.first > index) edge.first - 1 else edge.first
+                val b = if (edge.second > index) edge.second - 1 else edge.second
+                normalizedEdge(a, b) to value
+            }
+        }.toMap().filterKeys { it in updatedEdges }
+        draftPoints = updatedPoints
+        draftEdges = updatedEdges
+        draftAngles = updatedAngles
+        selectedPoint = -1
+        pointMenuIndex = -1
+        saveGeometry(updatedPoints, updatedEdges, updatedAngles)
     }
 
     BoxWithConstraints(
@@ -312,30 +341,8 @@ fun PatternDesignerWorkspace(
                     Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text("Point ${pointMenuIndex + 1}", style = MaterialTheme.typography.labelMedium)
                         TextButton(onClick = {
-                            val removed = pointMenuIndex
-                            val updatedPoints = draftPoints.toMutableList().also { it.removeAt(removed) }
-                            val wasLinkedBefore = removed > 0 && draftEdges.contains(normalizedEdge(removed - 1, removed))
-                            val wasLinkedAfter = removed < draftPoints.lastIndex && draftEdges.contains(normalizedEdge(removed, removed + 1))
-                            val updatedEdges = draftEdges.mapNotNull { (a, b) ->
-                                if (a == removed || b == removed) null else normalizedEdge(if (a > removed) a - 1 else a, if (b > removed) b - 1 else b)
-                            }.toMutableSet().apply {
-                                if (wasLinkedBefore && wasLinkedAfter && removed > 0 && removed < draftPoints.lastIndex) {
-                                    add(normalizedEdge(removed - 1, removed))
-                                }
-                            }
-                            val updatedAngles = draftAngles.mapNotNull { (edge, value) ->
-                                if (edge.first == removed || edge.second == removed) null else {
-                                    val a = if (edge.first > removed) edge.first - 1 else edge.first
-                                    val b = if (edge.second > removed) edge.second - 1 else edge.second
-                                    normalizedEdge(a, b) to value
-                                }
-                            }.toMap().filterKeys { it in updatedEdges }
-                            draftPoints = updatedPoints
-                            draftEdges = updatedEdges
-                            draftAngles = updatedAngles
-                            saveGeometry(updatedPoints, updatedEdges, updatedAngles)
-                            selectedPoint = -1
-                            pointMenuIndex = -1
+                            pendingDeletePointIndex = pointMenuIndex
+                            pendingDeleteAction = "POINT"
                         }, modifier = Modifier.fillMaxWidth()) { Text("Delete point") }
                         TextButton(onClick = { selectedPoint = pointMenuIndex; mode = "EDIT"; pointMenuIndex = -1 }, modifier = Modifier.fillMaxWidth()) { Text("Edit point") }
                         TextButton(onClick = { selectedPoint = pointMenuIndex; pendingConnectionAction = "DISCONNECT"; mode = "EDIT"; pointMenuIndex = -1 }, modifier = Modifier.fillMaxWidth()) { Text("Disconnect point") }
@@ -476,39 +483,14 @@ fun PatternDesignerWorkspace(
                 ) { Text(if (selectedPiece.isClosed) "Reopen path" else "Close shape") }
                 OutlinedButton(
                     onClick = {
-                        val removed = selectedPoint
-                        val updated = draftPoints.toMutableList().also { it.removeAt(removed) }
-                        val wasLinkedBefore = removed > 0 && draftEdges.contains(normalizedEdge(removed - 1, removed))
-                        val wasLinkedAfter = removed < draftPoints.lastIndex && draftEdges.contains(normalizedEdge(removed, removed + 1))
-                        val updatedEdges = draftEdges.mapNotNull { (a, b) ->
-                            if (a == removed || b == removed) null else normalizedEdge(if (a > removed) a - 1 else a, if (b > removed) b - 1 else b)
-                        }.toMutableSet().apply {
-                            if (wasLinkedBefore && wasLinkedAfter && removed > 0 && removed < draftPoints.lastIndex) {
-                                add(normalizedEdge(removed - 1, removed))
-                            }
-                        }
-                        val updatedAngles = draftAngles.mapNotNull { (edge, value) ->
-                            if (edge.first == removed || edge.second == removed) null else {
-                                val a = if (edge.first > removed) edge.first - 1 else edge.first
-                                val b = if (edge.second > removed) edge.second - 1 else edge.second
-                                normalizedEdge(a, b) to value
-                            }
-                        }.toMap().filterKeys { it in updatedEdges }
-                        draftPoints = updated
-                        draftEdges = updatedEdges
-                        draftAngles = updatedAngles
-                        selectedPoint = -1
-                        pointMenuIndex = -1
-                        saveGeometry(updated, updatedEdges, updatedAngles)
+                        pendingDeletePointIndex = selectedPoint
+                        pendingDeleteAction = "POINT"
                     },
                     enabled = selectedPoint in draftPoints.indices,
                     modifier = Modifier.fillMaxWidth()
                 ) { Text("Remove selected point") }
                 OutlinedButton(
-                    onClick = {
-                        scope.launch { dao.deletePiece(selectedPiece.id) }
-                        selectedId = null
-                    },
+                    onClick = { pendingDeleteAction = "PIECE" },
                     modifier = Modifier.fillMaxWidth()
                 ) { Text("Delete piece") }
             }
@@ -523,6 +505,39 @@ fun PatternDesignerWorkspace(
             Text("Grid: 10 mm", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
+    }
+
+    if (pendingDeleteAction != null) {
+        val deletingPiece = pendingDeleteAction == "PIECE"
+        AlertDialog(
+            onDismissRequest = { pendingDeleteAction = null; pendingDeletePointIndex = -1 },
+            title = { Text(if (deletingPiece) "Delete pattern piece?" else "Delete point?") },
+            text = {
+                Text(if (deletingPiece) {
+                    "“" + (selectedPiece?.name ?: "This pattern piece") + "” and its saved geometry will be permanently deleted."
+                } else {
+                    "This point and its connected edge settings will be removed from the pattern."
+                })
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (deletingPiece) {
+                            selectedPiece?.let { piece -> scope.launch { dao.deletePiece(piece.id) } }
+                            selectedId = null
+                        } else {
+                            removePoint(pendingDeletePointIndex)
+                        }
+                        pendingDeleteAction = null
+                        pendingDeletePointIndex = -1
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text(if (deletingPiece) "Delete piece" else "Delete point") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeleteAction = null; pendingDeletePointIndex = -1 }) { Text("Cancel") }
+            }
+        )
     }
 
     if (showNewPiece) {
