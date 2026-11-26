@@ -117,8 +117,10 @@ fun PatternDesignerWorkspace(
                             if (mode == "ADD") {
                                 if (selectedPiece != null && !selectedPiece.isClosed) {
                                     val next = currentDraftPoints + world
+                                    val nextEdges = draftEdges + if (next.size > 1) setOf((next.size - 2) to (next.size - 1)) else emptySet()
                                     draftPoints = next
-                                    savePoints(next)
+                                    draftEdges = nextEdges
+                                    saveGeometry(next, nextEdges)
                                 }
                             } else {
                                 val nearest = currentDraftPoints.indices.minByOrNull { index ->
@@ -128,13 +130,23 @@ fun PatternDesignerWorkspace(
                                         (size.height / 2f + pan.y + point.y * zoom) - tap.y
                                     )
                                 }
-                                selectedPoint = nearest?.takeIf { index ->
+                                val target = nearest?.takeIf { index ->
                                     val point = currentDraftPoints[index]
                                     hypot(
                                         (size.width / 2f + pan.x + point.x * zoom) - tap.x,
                                         (size.height / 2f + pan.y + point.y * zoom) - tap.y
                                     ) < 28f
                                 } ?: -1
+                                if (pendingConnectionAction != null && target >= 0 && target != selectedPoint) {
+                                    val edge = normalizedEdge(selectedPoint, target)
+                                    val updatedEdges = if (pendingConnectionAction == "CONNECT") draftEdges + edge else draftEdges - edge
+                                    draftEdges = updatedEdges
+                                    saveGeometry(currentDraftPoints, updatedEdges)
+                                    pendingConnectionAction = null
+                                    selectedPoint = target
+                                } else {
+                                    selectedPoint = target
+                                }
                             }
                         }
                     }
@@ -172,7 +184,7 @@ fun PatternDesignerWorkspace(
                                 }
                             },
                             onDragEnd = {
-                                if (movingIndex >= 0) savePoints(currentDraftPoints)
+                                if (movingIndex >= 0) saveGeometry(currentDraftPoints, draftEdges)
                                 movingIndex = -1
                             },
                             onDragCancel = { movingIndex = -1 }
@@ -220,16 +232,18 @@ fun PatternDesignerWorkspace(
                 pieces.forEach { piece ->
                     val points = if (piece.id == selectedPiece?.id) draftPoints else decodePatternPoints(piece.pointsData)
                     if (points.isNotEmpty()) {
-                        val path = Path().apply {
-                            moveTo(originX + points.first().x * zoom, originY + points.first().y * zoom)
-                            points.drop(1).forEach { lineTo(originX + it.x * zoom, originY + it.y * zoom) }
-                            if (piece.isClosed && points.size >= 3) close()
+                        val edges = if (piece.id == selectedPiece?.id) draftEdges else decodeGeometry(piece.pointsData, piece.isClosed).edges
+                        val lineColor = if (piece.id == selectedPiece?.id) Color(0xFF765B49) else Color(0xFF9A9A9A)
+                        edges.forEach { (a, b) ->
+                            if (a in points.indices && b in points.indices) {
+                                drawLine(
+                                    lineColor,
+                                    Offset(originX + points[a].x * zoom, originY + points[a].y * zoom),
+                                    Offset(originX + points[b].x * zoom, originY + points[b].y * zoom),
+                                    strokeWidth = 2.2f
+                                )
+                            }
                         }
-                        drawPath(
-                            path,
-                            if (piece.id == selectedPiece?.id) Color(0xFF765B49) else Color(0xFF9A9A9A),
-                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.2f)
-                        )
                         if (piece.id == selectedPiece?.id) {
                             points.forEachIndexed { index, point ->
                                 val p = Offset(originX + point.x * zoom, originY + point.y * zoom)
@@ -294,7 +308,7 @@ fun PatternDesignerWorkspace(
                         Column(Modifier.fillMaxWidth()) {
                             Text(piece.name, maxLines = 1)
                             Text(
-                                "${decodePatternPoints(piece.pointsData).size} points" + if (piece.isClosed) " · Closed" else " · Open",
+                                "${decodeGeometry(piece.pointsData, piece.isClosed).points.size} points" + if (piece.isClosed) " · Closed" else " · Open",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
