@@ -75,21 +75,21 @@ fun SketchbookWorkspace(project: GarmentProject, database: SeamworkDatabase, bac
         Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
             .windowInsetsPadding(WindowInsets.systemBars)
     ) {
-        Row(Modifier.fillMaxSize()) {
+        Box(Modifier.fillMaxSize()) {
             if (selectedPage != null) {
                 SketchPageEditor(
                     page = selectedPage,
                     save = { dao.updatePage(it) },
-                    modifier = Modifier.weight(1f).fillMaxHeight()
+                    modifier = Modifier.fillMaxSize()
                 )
             } else {
-                Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
             }
             if (selectedPage != null) {
                 Column(
-                    Modifier.width(58.dp).fillMaxHeight().padding(5.dp),
+                    Modifier.align(Alignment.CenterStart).width(58.dp).padding(5.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
@@ -145,7 +145,7 @@ private fun SketchPageEditor(page: SketchPage, save: suspend (SketchPage) -> Uni
     var currentPoints by remember(page.id) { mutableStateOf<List<Offset>>(emptyList()) }
     var tool by remember(page.id) { mutableStateOf("PEN") }
     var penOnly by remember(page.id) { mutableStateOf(true) }
-    var sidebarVisible by remember(page.id) { mutableStateOf(true) }
+    var sidebarVisible by remember(page.id) { mutableStateOf(false) }
     var brushColor by remember(page.id) { mutableIntStateOf(AndroidColor.parseColor("#765B49")) }
     var brushSize by remember(page.id) { mutableFloatStateOf(3.5f) }
     var paperSize by remember(page.id) { mutableStateOf(page.paperSize) }
@@ -161,8 +161,8 @@ private fun SketchPageEditor(page: SketchPage, save: suspend (SketchPage) -> Uni
         ))
     }
 
-    Row(modifier.fillMaxSize().background(Color(0xFFECE8E2))) {
-        Box(Modifier.weight(1f).fillMaxHeight()) {
+    Box(modifier.fillMaxSize().background(Color(0xFFECE8E2))) {
+        Box(Modifier.fillMaxSize()) {
             BoxWithConstraints(
                 Modifier.fillMaxSize().padding(12.dp),
                 contentAlignment = Alignment.Center
@@ -218,7 +218,7 @@ private fun SketchPageEditor(page: SketchPage, save: suspend (SketchPage) -> Uni
                                 do {
                                     val event = awaitPointerEvent()
                                     val pressed = event.changes.filter { it.pressed }
-                                    if (pressed.size >= 2 || pressed.firstOrNull()?.type == PointerType.Touch) {
+                                    if (pressed.size >= 2) {
                                         val zoomChange = event.calculateZoom()
                                         val panChange = event.calculatePan()
                                         zoom = (zoom * zoomChange).coerceIn(1f, 5f)
@@ -289,7 +289,8 @@ private fun SketchPageEditor(page: SketchPage, save: suspend (SketchPage) -> Uni
 
         if (sidebarVisible) {
             Column(
-                Modifier.width(210.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surface)
+                Modifier.align(Alignment.CenterEnd).width(230.dp).fillMaxHeight()
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.97f))
                     .padding(12.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
@@ -343,10 +344,10 @@ private fun SketchPageEditor(page: SketchPage, save: suspend (SketchPage) -> Uni
                 }
             }
         } else {
-            FilledTonalIconButton(
+            FilledTonalButton(
                 onClick = { sidebarVisible = true },
-                modifier = Modifier.align(Alignment.CenterVertically).padding(6.dp)
-            ) { Text("›") }
+                modifier = Modifier.align(Alignment.TopEnd).padding(12.dp)
+            ) { Text("Tools  ☰") }
         }
     }
 }
