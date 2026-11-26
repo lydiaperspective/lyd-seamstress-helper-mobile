@@ -126,6 +126,17 @@ fun SketchbookWorkspace(project: GarmentProject, database: SeamworkDatabase, bac
         val compactLayout = maxWidth < 600.dp
         Box(Modifier.fillMaxSize()) {
             if (selectedPage != null) {
+                SketchPageEditor(
+                    page = selectedPage,
+                    save = { dao.updatePage(it) },
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            }
+            if (selectedPage != null) {
                 if (compactLayout) {
                     Row(
                         Modifier.align(Alignment.BottomCenter).fillMaxWidth()
