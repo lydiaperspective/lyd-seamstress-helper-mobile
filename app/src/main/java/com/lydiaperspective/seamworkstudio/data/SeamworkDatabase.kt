@@ -62,6 +62,40 @@ data class SketchPage(
     val updatedAt: Long = System.currentTimeMillis()
 )
 
+@Entity(
+    tableName = "pattern_pieces",
+    foreignKeys = [ForeignKey(
+        entity = GarmentProject::class,
+        parentColumns = ["id"],
+        childColumns = ["projectId"],
+        onDelete = ForeignKey.CASCADE
+    )],
+    indices = [Index("projectId")]
+)
+data class PatternPiece(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val projectId: Long,
+    val name: String,
+    val pointsData: String = "",
+    val isClosed: Boolean = false,
+    val updatedAt: Long = System.currentTimeMillis()
+)
+
+@Dao
+interface PatternPieceDao {
+    @Query("SELECT * FROM pattern_pieces WHERE projectId = :projectId ORDER BY id ASC")
+    fun observePieces(projectId: Long): Flow<List<PatternPiece>>
+
+    @Insert
+    suspend fun insertPiece(piece: PatternPiece): Long
+
+    @Update
+    suspend fun updatePiece(piece: PatternPiece)
+
+    @Query("DELETE FROM pattern_pieces WHERE id = :pieceId")
+    suspend fun deletePiece(pieceId: Long)
+}
+
 @Dao
 interface ProjectDao {
     @Query("SELECT * FROM garment_projects ORDER BY createdAt DESC")
@@ -102,14 +136,15 @@ interface SketchPageDao {
 }
 
 @Database(
-    entities = [GarmentProject::class, InspirationItem::class, SketchPage::class],
-    version = 2,
+    entities = [GarmentProject::class, InspirationItem::class, SketchPage::class, PatternPiece::class],
+    version = 3,
     exportSchema = false
 )
 abstract class SeamworkDatabase : RoomDatabase() {
     abstract fun projectDao(): ProjectDao
     abstract fun inspirationDao(): InspirationDao
     abstract fun sketchPageDao(): SketchPageDao
+    abstract fun patternPieceDao(): PatternPieceDao
 
     companion object {
         private val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -132,6 +167,25 @@ abstract class SeamworkDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS pattern_pieces (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        projectId INTEGER NOT NULL,
+                        name TEXT NOT NULL,
+                        pointsData TEXT NOT NULL,
+                        isClosed INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL,
+                        FOREIGN KEY(projectId) REFERENCES garment_projects(id) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_pattern_pieces_projectId ON pattern_pieces(projectId)")
+            }
+        }
+
         @Volatile private var INSTANCE: SeamworkDatabase? = null
 
         fun get(context: Context): SeamworkDatabase =
@@ -140,7 +194,7 @@ abstract class SeamworkDatabase : RoomDatabase() {
                     context.applicationContext,
                     SeamworkDatabase::class.java,
                     "seamwork-studio.db"
-                ).addMigrations(MIGRATION_1_2).build().also { INSTANCE = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { INSTANCE = it }
             }
     }
 }
