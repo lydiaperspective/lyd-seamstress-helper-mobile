@@ -283,9 +283,15 @@ fun PatternDesignerWorkspace(
                         TextButton(onClick = {
                             val removed = pointMenuIndex
                             val updatedPoints = draftPoints.toMutableList().also { it.removeAt(removed) }
+                            val wasLinkedBefore = removed > 0 && draftEdges.contains(normalizedEdge(removed - 1, removed))
+                            val wasLinkedAfter = removed < draftPoints.lastIndex && draftEdges.contains(normalizedEdge(removed, removed + 1))
                             val updatedEdges = draftEdges.mapNotNull { (a, b) ->
-                                if (a == removed || b == removed) null else (if (a > removed) a - 1 else a) to (if (b > removed) b - 1 else b)
-                            }.toSet()
+                                if (a == removed || b == removed) null else normalizedEdge(if (a > removed) a - 1 else a, if (b > removed) b - 1 else b)
+                            }.toMutableSet().apply {
+                                if (wasLinkedBefore && wasLinkedAfter && removed > 0 && removed < draftPoints.lastIndex) {
+                                    add(normalizedEdge(removed - 1, removed))
+                                }
+                            }
                             draftPoints = updatedPoints
                             draftEdges = updatedEdges
                             saveGeometry(updatedPoints, updatedEdges)
@@ -386,9 +392,15 @@ fun PatternDesignerWorkspace(
                     onClick = {
                         val removed = selectedPoint
                         val updated = draftPoints.toMutableList().also { it.removeAt(removed) }
+                        val wasLinkedBefore = removed > 0 && draftEdges.contains(normalizedEdge(removed - 1, removed))
+                        val wasLinkedAfter = removed < draftPoints.lastIndex && draftEdges.contains(normalizedEdge(removed, removed + 1))
                         val updatedEdges = draftEdges.mapNotNull { (a, b) ->
-                            if (a == removed || b == removed) null else (if (a > removed) a - 1 else a) to (if (b > removed) b - 1 else b)
-                        }.toSet()
+                            if (a == removed || b == removed) null else normalizedEdge(if (a > removed) a - 1 else a, if (b > removed) b - 1 else b)
+                        }.toMutableSet().apply {
+                            if (wasLinkedBefore && wasLinkedAfter && removed > 0 && removed < draftPoints.lastIndex) {
+                                add(normalizedEdge(removed - 1, removed))
+                            }
+                        }
                         draftPoints = updated
                         draftEdges = updatedEdges
                         selectedPoint = -1
