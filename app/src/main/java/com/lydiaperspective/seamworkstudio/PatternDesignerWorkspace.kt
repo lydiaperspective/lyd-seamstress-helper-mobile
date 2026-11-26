@@ -167,7 +167,8 @@ fun PatternDesignerWorkspace(
                                     val edge = normalizedEdge(selectedPoint, target)
                                     val updatedEdges = if (pendingConnectionAction == "CONNECT") draftEdges + edge else draftEdges - edge
                                     draftEdges = updatedEdges
-                                    saveGeometry(currentDraftPoints, updatedEdges)
+                                    draftAngles = draftAngles.filterKeys { it in updatedEdges }
+                                    saveGeometry(currentDraftPoints, updatedEdges, draftAngles)
                                     pendingConnectionAction = null
                                     selectedPoint = target
                                 } else {
@@ -320,9 +321,17 @@ fun PatternDesignerWorkspace(
                                     add(normalizedEdge(removed - 1, removed))
                                 }
                             }
+                            val updatedAngles = draftAngles.mapNotNull { (edge, value) ->
+                                if (edge.first == removed || edge.second == removed) null else {
+                                    val a = if (edge.first > removed) edge.first - 1 else edge.first
+                                    val b = if (edge.second > removed) edge.second - 1 else edge.second
+                                    normalizedEdge(a, b) to value
+                                }
+                            }.toMap().filterKeys { it in updatedEdges }
                             draftPoints = updatedPoints
                             draftEdges = updatedEdges
-                            saveGeometry(updatedPoints, updatedEdges)
+                            draftAngles = updatedAngles
+                            saveGeometry(updatedPoints, updatedEdges, updatedAngles)
                             selectedPoint = -1
                             pointMenuIndex = -1
                         }, modifier = Modifier.fillMaxWidth()) { Text("Delete point") }
@@ -476,11 +485,19 @@ fun PatternDesignerWorkspace(
                                 add(normalizedEdge(removed - 1, removed))
                             }
                         }
+                        val updatedAngles = draftAngles.mapNotNull { (edge, value) ->
+                            if (edge.first == removed || edge.second == removed) null else {
+                                val a = if (edge.first > removed) edge.first - 1 else edge.first
+                                val b = if (edge.second > removed) edge.second - 1 else edge.second
+                                normalizedEdge(a, b) to value
+                            }
+                        }.toMap().filterKeys { it in updatedEdges }
                         draftPoints = updated
                         draftEdges = updatedEdges
+                        draftAngles = updatedAngles
                         selectedPoint = -1
                         pointMenuIndex = -1
-                        saveGeometry(updated, updatedEdges)
+                        saveGeometry(updated, updatedEdges, updatedAngles)
                     },
                     enabled = selectedPoint in draftPoints.indices,
                     modifier = Modifier.fillMaxWidth()
