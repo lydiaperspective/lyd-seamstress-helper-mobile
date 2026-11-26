@@ -259,16 +259,31 @@ fun PatternDesignerWorkspace(
                 pieces.forEach { piece ->
                     val points = if (piece.id == selectedPiece?.id) draftPoints else decodeGeometry(piece.pointsData, piece.isClosed).points
                     if (points.isNotEmpty()) {
-                        val edges = if (piece.id == selectedPiece?.id) draftEdges else decodeGeometry(piece.pointsData, piece.isClosed).edges
+                        val geometry = if (piece.id == selectedPiece?.id) null else decodeGeometry(piece.pointsData, piece.isClosed)
+                        val edges = if (piece.id == selectedPiece?.id) draftEdges else geometry!!.edges
+                        val angles = if (piece.id == selectedPiece?.id) draftAngles else geometry!!.angles
                         val lineColor = if (piece.id == selectedPiece?.id) Color(0xFF765B49) else Color(0xFF9A9A9A)
                         edges.forEach { (a, b) ->
                             if (a in points.indices && b in points.indices) {
-                                drawLine(
-                                    lineColor,
-                                    Offset(originX + points[a].x * zoom, originY + points[a].y * zoom),
-                                    Offset(originX + points[b].x * zoom, originY + points[b].y * zoom),
-                                    strokeWidth = 2.2f
-                                )
+                                val start = Offset(originX + points[a].x * zoom, originY + points[a].y * zoom)
+                                val end = Offset(originX + points[b].x * zoom, originY + points[b].y * zoom)
+                                val edge = normalizedEdge(a, b)
+                                val distance = hypot(end.x - start.x, end.y - start.y)
+                                val stored = if (a < b) angles[edge] else angles[edge]?.let { it.second to it.first }
+                                val angleA = Math.toRadians((stored?.first ?: defaultAngle(points[a], points[b])).toDouble())
+                                val angleB = Math.toRadians((stored?.second ?: defaultAngle(points[b], points[a])).toDouble())
+                                val handle = distance / 3f
+                                val curve = Path().apply {
+                                    moveTo(start.x, start.y)
+                                    cubicTo(
+                                        start.x + cos(angleA).toFloat() * handle,
+                                        start.y + sin(angleA).toFloat() * handle,
+                                        end.x + cos(angleB).toFloat() * handle,
+                                        end.y + sin(angleB).toFloat() * handle,
+                                        end.x, end.y
+                                    )
+                                }
+                                drawPath(curve, lineColor, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.2f))
                             }
                         }
                         if (piece.id == selectedPiece?.id) {
