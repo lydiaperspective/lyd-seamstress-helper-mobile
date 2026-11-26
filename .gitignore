@@ -1,0 +1,13 @@
+# Gradle-generated state (keep the shared Android Studio config placeholder below)
+.gradle/*
+!.gradle/config.properties
+
+# Android SDK location is machine-specific
+local.properties
+
+# Build outputs
+**/build/
+
+# Android Studio / IntelliJ user-specific files
+.idea/
+*.iml
