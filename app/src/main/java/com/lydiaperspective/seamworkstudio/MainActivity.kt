@@ -79,6 +79,11 @@ private fun SeamworkApp(database: SeamworkDatabase) {
                     database = database,
                     back = { activeWorkspace = null }
                 )
+                activeWorkspace == "Pattern Designer" -> PatternDesignerWorkspace(
+                    project = activeProject!!,
+                    database = database,
+                    back = { activeWorkspace = null }
+                )
                 else -> WorkspacePage(activeProject!!, activeWorkspace!!) { activeWorkspace = null }
             }
             if (showCreate) {
