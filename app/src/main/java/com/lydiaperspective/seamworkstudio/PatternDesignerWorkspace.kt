@@ -73,7 +73,7 @@ fun PatternDesignerWorkspace(
         }
     }
 
-    Box(
+    BoxWithConstraints(
         Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
             .windowInsetsPadding(WindowInsets.systemBars)
     ) {
@@ -237,7 +237,9 @@ fun PatternDesignerWorkspace(
             ) { Text("Tools  ☰") }
         }
         if (showTools) Column(
-            Modifier.align(Alignment.CenterEnd).width(260.dp).fillMaxHeight()
+            Modifier.align(Alignment.CenterEnd)
+                .width(if (maxWidth < 600.dp) maxWidth * 0.82f else 260.dp)
+                .fillMaxHeight()
                 .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.97f))
                 .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(9.dp)
