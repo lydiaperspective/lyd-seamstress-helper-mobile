@@ -227,15 +227,15 @@ private fun SketchPageEditor(page: SketchPage, save: suspend (SketchPage) -> Uni
     var sidebarVisible by remember(page.id) { mutableStateOf(false) }
     var brushColor by remember(page.id) { mutableIntStateOf(AndroidColor.parseColor("#765B49")) }
     var brushSize by remember(page.id) { mutableFloatStateOf(3.5f) }
-    var paperSize by remember(page.id) { mutableStateOf(page.paperSize) }
+    var showResetCanvasDialog by remember(page.id) { mutableStateOf(false) }
     var backgroundStyle by remember(page.id) { mutableStateOf(page.background) }
     var zoom by remember(page.id) { mutableFloatStateOf(1f) }
     var pan by remember(page.id) { mutableStateOf(Offset.Zero) }
     val density = LocalDensity.current
 
-    LaunchedEffect(page.id, strokes, paperSize, backgroundStyle) {
+    LaunchedEffect(page.id, strokes, backgroundStyle) {
         save(page.copy(
-            paperSize = paperSize, background = backgroundStyle,
+            paperSize = "Open", background = backgroundStyle,
             drawingData = encodeStrokes(strokes), updatedAt = System.currentTimeMillis()
         ))
     }
@@ -246,12 +246,8 @@ private fun SketchPageEditor(page: SketchPage, save: suspend (SketchPage) -> Uni
                 Modifier.fillMaxSize().padding(12.dp),
                 contentAlignment = Alignment.Center
             ) {
-                val ratio = when (paperSize) { "A4" -> 0.707f; "Letter" -> 0.773f; else -> 1.35f }
-                val canvasWidth = if (paperSize == "Open") maxWidth else minOf(maxWidth, maxHeight * ratio)
-                val canvasHeight = if (paperSize == "Open") maxHeight else canvasWidth / ratio
                 Box(
-                    Modifier.width(canvasWidth).height(canvasHeight)
-                        .then(if (paperSize == "Open") Modifier.background(Color.White) else Modifier.clip(RoundedCornerShape(4.dp)).background(Color.White))
+                    Modifier.fillMaxSize().background(Color.White)
                         .graphicsLayer {
                             scaleX = zoom; scaleY = zoom
                             translationX = pan.x; translationY = pan.y
@@ -446,12 +442,20 @@ private fun SketchPageEditor(page: SketchPage, save: suspend (SketchPage) -> Uni
                         }
                     }, enabled = redoHistory.isNotEmpty()) { Text("Redo") }
                 }
-                OutlinedButton(onClick = { zoom = 1f; pan = Offset.Zero }, modifier = Modifier.fillMaxWidth()) { Text("Reset view") }
+                OutlinedButton(
+                    onClick = {
+                        zoom = 1f
+                        pan = Offset.Zero
+                        liveInkView.value?.clearStroke()
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Reset view") }
+                OutlinedButton(
+                    onClick = { showResetCanvasDialog = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text("Reset canvas") }
                 HorizontalDivider()
-                Text("Paper size", style = MaterialTheme.typography.labelMedium)
-                listOf("A4", "Letter", "Open").forEach { size ->
-                    FilterChip(selected = paperSize == size, onClick = { paperSize = size }, label = { Text(size) })
-                }
                 Text("Background", style = MaterialTheme.typography.labelMedium)
                 listOf("GRID", "DOTS", "BLANK").forEach { style ->
                     FilterChip(selected = backgroundStyle == style, onClick = { backgroundStyle = style },
@@ -463,6 +467,30 @@ private fun SketchPageEditor(page: SketchPage, save: suspend (SketchPage) -> Uni
                 onClick = { sidebarVisible = true },
                 modifier = Modifier.align(Alignment.TopEnd).padding(12.dp)
             ) { Text("Tools  ☰") }
+        }
+        if (showResetCanvasDialog) {
+            AlertDialog(
+                onDismissRequest = { showResetCanvasDialog = false },
+                title = { Text("Reset canvas?") },
+                text = { Text("This will clear all drawing on this page. This action cannot be undone.") },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            strokes = emptyList()
+                            undoHistory = emptyList()
+                            redoHistory = emptyList()
+                            liveInkView.value?.clearStroke()
+                            zoom = 1f
+                            pan = Offset.Zero
+                            showResetCanvasDialog = false
+                        },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    ) { Text("Reset canvas") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showResetCanvasDialog = false }) { Text("Cancel") }
+                }
+            )
         }
     }
 }
