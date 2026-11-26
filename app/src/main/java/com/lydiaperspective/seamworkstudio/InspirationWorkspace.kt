@@ -241,19 +241,51 @@ private fun WebReferencePreview(url: String, title: String) {
     val imageUrl by produceState<String?>(initialValue = null, url) {
         value = withContext(Dispatchers.IO) {
             runCatching {
-                val doc = Jsoup.connect(url).userAgent("Mozilla/5.0 (compatible; SeamworkStudio/1.0)")
-                    .timeout(8000).get()
-                doc.selectFirst("meta[property=og:image]")?.attr("content")
-                    ?.takeIf { it.isNotBlank() }
-                    ?: doc.selectFirst("meta[name=twitter:image]")?.attr("content")?.takeIf { it.isNotBlank() }
+                val response = Jsoup.connect(url)
+                    .userAgent("Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36")
+                    .referrer("https://www.google.com/")
+                    .timeout(15000)
+                    .followRedirects(true)
+                    .ignoreContentType(true)
+                    .execute()
+
+                // Some image-search results are direct image URLs rather than HTML pages.
+                if (response.contentType()?.startsWith("image/") == true) {
+                    response.url().toString()
+                } else {
+                    val doc = response.parse()
+                    val selectors = listOf(
+                        "meta[property=og:image]",
+                        "meta[property=og:image:secure_url]",
+                        "meta[name=twitter:image]",
+                        "meta[name=twitter:image:src]",
+                        "link[rel=image_src]"
+                    )
+
+                    val socialImage = selectors.firstNotNullOfOrNull { selector ->
+                        doc.selectFirst(selector)?.let { element ->
+                            val value = element.attr("content").ifBlank { element.attr("href") }
+                            element.absUrl(if (element.hasAttr("content")) "content" else "href")
+                                .ifBlank { value.takeIf { it.startsWith("https://") || it.startsWith("http://") } ?: "" }
+                                .takeIf { it.isNotBlank() }
+                        }
+                    }
+
+                    // Fall back to the first image embedded in the page when social metadata is absent.
+                    socialImage ?: doc.select("img[src]")
+                        .asSequence()
+                        .map { it.absUrl("src") }
+                        .firstOrNull { it.startsWith("https://") || it.startsWith("http://") }
+                }
             }.getOrNull()
         }
     }
+
     Box(
         Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        if (imageUrl != null) {
+        if (!imageUrl.isNullOrBlank()) {
             AsyncImage(
                 model = imageUrl,
                 contentDescription = title,
@@ -268,7 +300,7 @@ private fun WebReferencePreview(url: String, title: String) {
             ) {
                 Text("↗", style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.primary)
                 Text(title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text("Web reference", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Preview unavailable", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
