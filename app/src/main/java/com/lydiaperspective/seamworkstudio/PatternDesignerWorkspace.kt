@@ -56,6 +56,7 @@ fun PatternDesignerWorkspace(
     var pan by remember { mutableStateOf(Offset.Zero) }
     var showNewPiece by remember { mutableStateOf(false) }
     var newPieceName by remember { mutableStateOf("") }
+    val currentDraftPoints by rememberUpdatedState(draftPoints)
 
     LaunchedEffect(selectedPiece?.id, selectedPiece?.pointsData) {
         draftPoints = selectedPiece?.let { decodePatternPoints(it.pointsData) } ?: emptyList()
@@ -148,7 +149,7 @@ fun PatternDesignerWorkspace(
         Box(Modifier.weight(1f).fillMaxHeight().background(Color(0xFFF1EEE9))) {
             Canvas(
                 Modifier.fillMaxSize()
-                    .pointerInput(mode, selectedPiece?.id, draftPoints, zoom, pan) {
+                    .pointerInput(mode, selectedPiece?.id, selectedPiece?.isClosed, zoom, pan) {
                         detectTapGestures { tap ->
                             val world = Offset(
                                 (tap.x - size.width / 2f - pan.x) / zoom,
@@ -156,20 +157,20 @@ fun PatternDesignerWorkspace(
                             )
                             if (mode == "ADD") {
                                 if (selectedPiece != null && !selectedPiece.isClosed) {
-                                    val next = draftPoints + world
+                                    val next = currentDraftPoints + world
                                     draftPoints = next
                                     savePoints(next)
                                 }
                             } else {
-                                val nearest = draftPoints.indices.minByOrNull { index ->
-                                    val point = draftPoints[index]
+                                val nearest = currentDraftPoints.indices.minByOrNull { index ->
+                                    val point = currentDraftPoints[index]
                                     hypot(
                                         (size.width / 2f + pan.x + point.x * zoom) - tap.x,
                                         (size.height / 2f + pan.y + point.y * zoom) - tap.y
                                     )
                                 }
                                 selectedPoint = nearest?.takeIf { index ->
-                                    val point = draftPoints[index]
+                                    val point = currentDraftPoints[index]
                                     hypot(
                                         (size.width / 2f + pan.x + point.x * zoom) - tap.x,
                                         (size.height / 2f + pan.y + point.y * zoom) - tap.y
@@ -178,13 +179,13 @@ fun PatternDesignerWorkspace(
                             }
                         }
                     }
-                    .pointerInput(mode, selectedPiece?.id, draftPoints, zoom, pan) {
+                    .pointerInput(mode, selectedPiece?.id, selectedPiece?.isClosed, zoom, pan) {
                         var movingIndex = -1
                         detectDragGestures(
                             onDragStart = { start ->
                                 if (mode == "EDIT") {
-                                    movingIndex = draftPoints.indices.minByOrNull { index ->
-                                        val point = draftPoints[index]
+                                    movingIndex = currentDraftPoints.indices.minByOrNull { index ->
+                                        val point = currentDraftPoints[index]
                                         hypot(
                                             (size.width / 2f + pan.x + point.x * zoom) - start.x,
                                             (size.height / 2f + pan.y + point.y * zoom) - start.y
@@ -202,7 +203,7 @@ fun PatternDesignerWorkspace(
                             },
                             onDrag = { change, _ ->
                                 if (movingIndex >= 0 && mode == "EDIT") {
-                                    val updated = draftPoints.toMutableList()
+                                    val updated = currentDraftPoints.toMutableList()
                                     updated[movingIndex] = Offset(
                                         (change.position.x - size.width / 2f - pan.x) / zoom,
                                         (change.position.y - size.height / 2f - pan.y) / zoom
@@ -212,7 +213,7 @@ fun PatternDesignerWorkspace(
                                 }
                             },
                             onDragEnd = {
-                                if (movingIndex >= 0) savePoints(draftPoints)
+                                if (movingIndex >= 0) savePoints(currentDraftPoints)
                                 movingIndex = -1
                             },
                             onDragCancel = { movingIndex = -1 }
